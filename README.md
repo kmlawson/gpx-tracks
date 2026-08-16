@@ -56,8 +56,8 @@ target is wider than the drawn line, so it does not need a precise finger.
 
 ### The track list
 
-The left panel lists every track with its date, distance, altitude spread and
-duration.
+The left panel lists every track with its country (when it has one), distance
+and date.
 
 - **Search** — type in the box to filter by name, activity, or date. Multiple
   words all have to match.
@@ -111,8 +111,10 @@ Signed in, **Option-click** (Alt-click) any track in the list to open its editor
 | **Country** | Free text, offered as a datalist of the countries already in use so they stay consistent |
 | **Tags** | Comma-separated. Up to 12 per track, 30 characters each, de-duplicated case-insensitively |
 
-The same editor opens from **List & edit tracks** in the Upload dialog, which
-also offers **Delete** (two clicks). Renaming rewrites the stored GPX as well as
+The editor also has a **Delete track** button at the bottom, set apart by a rule
+so it is not the button you press on the way out, and needing two clicks. The
+same editor opens from **List & edit tracks** in the Upload dialog, which offers
+**Delete** on each row as well. Renaming rewrites the stored GPX as well as
 the catalogue record, so the name inside the file never contradicts the name on
 the page.
 
@@ -145,8 +147,9 @@ tags can be set in bulk: renaming twenty tracks to the same thing is never what
 anyone means, and one date across a selection is rarely right either.
 
 An empty box leaves that field alone rather than clearing it, and tags are
-**added** to each track rather than replacing what is there. Escape, or the
-`clear` link, drops the selection.
+**added** to each track rather than replacing what is there. There is no Delete
+in this mode — removing twenty tracks behind one button is not something to
+offer. Escape, or the `clear` link, drops the selection.
 
 ### Dates in track names
 
@@ -168,7 +171,9 @@ collection.
 
 The **Upload** button opens a dialog: sign in once with the collection password,
 then choose a `.gpx` file. There is a progress bar for large files, and the new
-track is selected on the map as soon as it lands. Re-uploading a track that is
+track is selected on the map as soon as it lands — and the list scrolls to it,
+which matters once the collection is long enough that a new track can sort well
+off the bottom of the visible rows. Re-uploading a track that is
 already in the collection is refused rather than duplicated.
 
 Once signed in you can also **drag `.gpx` files straight onto the track list**. The

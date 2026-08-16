@@ -439,6 +439,25 @@
     }
   }
 
+  /**
+   * Bring a track's row into view. After an upload the new track is selected,
+   * but with a long collection it can be sorted anywhere — including well off
+   * the bottom of the list — so selecting it alone leaves you looking at a
+   * highlighted row you cannot see.
+   */
+  function scrollListTo(id) {
+    var rows = $('track-list').querySelectorAll('button.track');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dataset.id === id) {
+        if (rows[i].scrollIntoView) {
+          rows[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        return true;
+      }
+    }
+    return false;   // filtered out of the current view
+  }
+
   function renderList() {
     var q = $('search').value.trim().toLowerCase();
     var terms = q ? q.split(/\s+/) : [];
@@ -476,12 +495,19 @@
 
       var m = document.createElement('span');
       m.className = 'tmeta';
-      [fmtDateDot(displayDate(t).iso), fmtKm(t.distance_m), '↕ ' + fmtEle(t.ele_spread), fmtDur(t.duration_s)]
-        .forEach(function (piece) {
-          var s = document.createElement('span');
-          s.textContent = piece;
-          m.appendChild(s);
-        });
+      // Country (when there is one), distance, date. The " · " between them is
+      // a CSS ::before on each span after the first, so order is all that
+      // matters here and a missing country leaves no stray separator.
+      var bits = [];
+      var country = countryOf(t);
+      if (country) bits.push(country);
+      bits.push(fmtKm(t.distance_m));
+      bits.push(fmtDateDot(displayDate(t).iso));
+      bits.forEach(function (piece) {
+        var s = document.createElement('span');
+        s.textContent = piece;
+        m.appendChild(s);
+      });
 
       b.appendChild(n);
       b.appendChild(m);
@@ -1357,7 +1383,11 @@
 
   function editorOpen(show) {
     $('editor').hidden = !show;
-    if (!show) { editing = null; bulkIds = null; $('ed-progress').hidden = true; }
+    if (!show) {
+      editing = null; bulkIds = null;
+      $('ed-progress').hidden = true;
+      resetEditorDelete();
+    }
   }
 
   /**
@@ -1372,6 +1402,8 @@
 
     $('ed-name-field').hidden = true;
     $('ed-date-field').hidden = true;
+    // Deleting twenty tracks behind a single button is not a thing to offer.
+    $('ed-delete-row').hidden = true;
     $('ed-err').hidden = true;
     $('ed-progress').hidden = true;
     $('ed-country').value = '';
@@ -1400,6 +1432,8 @@
     bulkIds = null;
     $('ed-name-field').hidden = false;
     $('ed-date-field').hidden = false;
+    $('ed-delete-row').hidden = false;
+    resetEditorDelete();
     $('ed-progress').hidden = true;
     $('ed-tag-hint').textContent = 'Separate tags with commas.';
     $('ed-err').hidden = true;
@@ -1419,6 +1453,51 @@
     $('ed-name').focus();
     $('ed-name').select();
   }
+
+  /* Two clicks, like the one in the track list: deleting is not undoable. */
+  var edDeleteArmed = false;
+
+  function resetEditorDelete() {
+    edDeleteArmed = false;
+    var b = $('ed-delete');
+    b.classList.remove('armed');
+    b.textContent = 'Delete track';
+    b.disabled = false;
+  }
+
+  $('ed-delete').addEventListener('click', function () {
+    if (!editing) return;
+    var t = editing;
+    var b = $('ed-delete');
+    if (!edDeleteArmed) {
+      edDeleteArmed = true;
+      b.classList.add('armed');
+      b.textContent = 'Really delete this track?';
+      setTimeout(function () { if (edDeleteArmed) resetEditorDelete(); }, 4000);
+      return;
+    }
+    b.disabled = true;
+    $('ed-save').disabled = true;
+    var body = new FormData();
+    body.append('action', 'delete');
+    body.append('id', t.id);
+    manageSend(body)
+      .then(function () {
+        if (current && current.id === t.id) showAll();
+        return loadCatalogue();
+      })
+      .then(function () {
+        if (!$('manage').hidden) renderManage();
+        editorOpen(false);
+        toast('Deleted \u201c' + displayName(t) + '\u201d');
+      })
+      .catch(function (err) {
+        $('ed-err').textContent = err.message;
+        $('ed-err').hidden = false;
+        resetEditorDelete();
+      })
+      .then(function () { $('ed-save').disabled = false; });
+  });
 
   $('editor-close').addEventListener('click', function () { editorOpen(false); });
   $('editor').addEventListener('click', function (e) {
@@ -1705,6 +1784,7 @@
         $('file').value = '';
         return loadCatalogue().then(function () {
           selectTrack(track.id, true);
+          scrollListTo(track.id);
           showModal(false);
           toast('Added \u201c' + (track.name || track.id) + '\u201d');
         });
@@ -1832,8 +1912,11 @@
         bar.style.width = '0%';
         if (added.length === 1 && !failed.length) {
           selectTrack(added[0].id, true);
+          scrollListTo(added[0].id);
           toast('Added \u201c' + (added[0].name || added[0].id) + '\u201d');
         } else if (added.length) {
+          // Several: show where the newest of them landed.
+          scrollListTo(added[added.length - 1].id);
           toast(added.length + ' tracks added'
             + (failed.length ? ', ' + failed.length + ' failed' : ''));
         }

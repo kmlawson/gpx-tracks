@@ -309,6 +309,15 @@ body { display: flex; flex-direction: column; }
 .field { display: grid; gap: 6px; }
 .field[hidden] { display: none; }
 
+/* Set apart from Save by a rule and a gap, so it is never the button you press
+   by reflex on the way out of the dialog. */
+.ed-danger {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  text-align: right;
+}
+
 /* ---------------- trip info ---------------- */
 
 #info-body { overflow-y: auto; padding: 12px; flex: 1 1 auto; }

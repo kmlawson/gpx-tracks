@@ -190,6 +190,10 @@
       <button type="submit" class="primary" id="ed-save">Save</button>
       <div class="progress" id="ed-progress" hidden><div class="bar" id="ed-bar"></div></div>
       <p class="err" id="ed-err" hidden></p>
+      <!-- Single-track editing only; hidden when editing a selection. -->
+      <p class="ed-danger" id="ed-delete-row">
+        <button type="button" class="rowbtn danger" id="ed-delete">Delete track</button>
+      </p>
     </form>
   </div>
 </div>
