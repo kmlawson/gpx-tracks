@@ -51,7 +51,10 @@ Not available on touch, which is fine — pinch does the same job there.
 
 Every track in the list also gets a dot on the map, at the centre of its
 bounding box, so the collection is visible geographically and not only as a list.
-Hovering names it; clicking one selects that track and opens its trip info. The
+Hovering names it; clicking one selects that track and opens its trip info. On a
+phone the dot stays the same size but its hit zone is widened to about 44px
+across — a 5px circle is a fine mouse target and a hopeless finger one — using
+the canvas renderer's hit tolerance rather than by drawing anything bigger. The
 dots follow the list, so a search or a country filter narrows them too, and the
 selected track drops its own dot because its line is already drawn. It is a
 locator rather than a waypoint — on a C-shaped route the centre of the box can

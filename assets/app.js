@@ -38,12 +38,28 @@
     [EDINBURGH[0] + 2.85, EDINBURGH[1] + 3.2]
   ];
 
+  /**
+   * How far outside a shape a tap still counts as hitting it.
+   *
+   * A track pin is a 5px circle: about a 12px target, which is fine with a
+   * mouse and hopeless with a finger. Leaflet adds this tolerance to every
+   * canvas hit test, so the dot stays small while its hit zone becomes roughly
+   * 44px across — without drawing anything bigger.
+   */
+  var TAP_TOLERANCE = 16;
+
+  var vectorRenderer = L.canvas({ tolerance: MOBILE() ? TAP_TOLERANCE : 0 });
+
   var map = L.map('map', {
     zoomControl: true,
     minZoom: 2,
     maxZoom: 19,
     worldCopyJump: true,
     preferCanvas: true,
+    // Ours rather than Leaflet's implicit one, so the tolerance can be changed
+    // when the layout crosses the breakpoint. Path._clickTolerance() reads it
+    // on every hit test, so updating it takes effect immediately.
+    renderer: vectorRenderer,
     // Half steps for fitted views only. Whole levels are a blunt instrument for
     // fitting a country: the opening view needs a little more than zoom 7 shows
     // and would otherwise drop to 6, which is the whole British Isles and most
@@ -449,6 +465,7 @@
       layoutDefaults();
       showUploadBtn(altHeld);   // the rule differs either side of the breakpoint
       applyMobileChrome();
+      vectorRenderer.options.tolerance = MOBILE() ? TAP_TOLERANCE : 0;
     }
     map.invalidateSize();
     if (current) drawProfile();
