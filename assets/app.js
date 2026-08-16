@@ -1607,54 +1607,177 @@
       .catch(function () { sessionHint(false); setAuthUi(false); });
   });
 
+  /**
+   * One upload. Shared by the dialog and by dropping files on the track list,
+   * so both get the same validation, the same progress and the same handling of
+   * an expired session.
+   *
+   * @param {File} file
+   * @param {function(number)} onProgress 0-100
+   * @returns {Promise<object>} the stored track's metadata
+   */
+  function uploadFile(file, onProgress) {
+    return new Promise(function (resolve, reject) {
+      if (!/\.gpx$/i.test(file.name)) { reject(new Error('Not a .gpx file')); return; }
+      if (file.size > 25 * 1024 * 1024) { reject(new Error('Larger than 25 MB')); return; }
+
+      var body = new FormData();
+      body.append('csrf', csrf || '');
+      body.append('gpx', file, file.name);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'api/upload.php', true);
+      xhr.withCredentials = true;
+      if (onProgress) {
+        xhr.upload.onprogress = function (ev) {
+          if (ev.lengthComputable) onProgress(Math.round(ev.loaded / ev.total * 100));
+        };
+      }
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        var d = {};
+        try { d = JSON.parse(xhr.responseText); } catch (e) { /* non-JSON error page */ }
+        if (xhr.status === 200 && d.ok) { resolve(d.track); return; }
+        // 401: session gone. 403: token rotated or expired — in both cases pull
+        // a fresh session/token so the next attempt can succeed.
+        if (xhr.status === 401) { setAuthUi(false); refreshSession(); }
+        else if (xhr.status === 403) { refreshSession(); }
+        reject(new Error(d.error || ('Upload failed (HTTP ' + xhr.status + ')')));
+      };
+      xhr.onerror = function () { reject(new Error('Network error')); };
+      xhr.send(body);
+    });
+  }
+
   $('upload-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var err = $('upload-err'), ok = $('upload-ok');
     err.hidden = true; ok.hidden = true;
     var f = $('file').files[0];
     if (!f) { err.textContent = 'Choose a .gpx file first.'; err.hidden = false; return; }
-    if (!/\.gpx$/i.test(f.name)) { err.textContent = 'That is not a .gpx file.'; err.hidden = false; return; }
-    if (f.size > 25 * 1024 * 1024) { err.textContent = 'File is larger than 25 MB.'; err.hidden = false; return; }
 
-    var body = new FormData();
-    body.append('csrf', csrf || '');
-    body.append('gpx', f, f.name);
-
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'api/upload.php', true);
-    xhr.withCredentials = true;
     $('upload-go').disabled = true;
     $('progress').hidden = false;
-    xhr.upload.onprogress = function (ev) {
-      if (ev.lengthComputable) $('progress-bar').style.width = Math.round(ev.loaded / ev.total * 100) + '%';
-    };
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState !== 4) return;
-      $('upload-go').disabled = false;
-      $('progress').hidden = true;
-      $('progress-bar').style.width = '0';
-      var d = {};
-      try { d = JSON.parse(xhr.responseText); } catch (e3) { /* non-JSON error page */ }
-      if (xhr.status === 200 && d.ok) {
-        ok.textContent = 'Uploaded: ' + (d.track.name || d.track.id);
+    uploadFile(f, function (pct) { $('progress-bar').style.width = pct + '%'; })
+      .then(function (track) {
+        ok.textContent = 'Uploaded: ' + (track.name || track.id);
         ok.hidden = false;
         $('file').value = '';
-        loadCatalogue().then(function () {
-          selectTrack(d.track.id, true);
+        return loadCatalogue().then(function () {
+          selectTrack(track.id, true);
           showModal(false);
-          toast('Added “' + (d.track.name || d.track.id) + '”');
+          toast('Added \u201c' + (track.name || track.id) + '\u201d');
         });
-      } else {
-        // 401: session gone. 403: token rotated or expired — in both cases
-        // pull a fresh session/token so the next attempt can succeed.
-        if (xhr.status === 401) { setAuthUi(false); refreshSession(); }
-        else if (xhr.status === 403) { refreshSession(); }
-        err.textContent = d.error || ('Upload failed (HTTP ' + xhr.status + ')');
-        err.hidden = false;
-      }
-    };
-    xhr.send(body);
+      })
+      .catch(function (e2) { err.textContent = e2.message; err.hidden = false; })
+      .then(function () {
+        $('upload-go').disabled = false;
+        $('progress').hidden = true;
+        $('progress-bar').style.width = '0';
+      });
   });
+
+  /* ------------------------------------------------------------------ *
+   * Dropping files on the track list
+   * ------------------------------------------------------------------ */
+
+  var dragDepth = 0;    // dragenter/dragleave fire per child, so count them
+
+  function gpxFilesFrom(dt) {
+    var out = [];
+    var files = (dt && dt.files) ? dt.files : [];
+    for (var i = 0; i < files.length; i++) {
+      if (/\.gpx$/i.test(files[i].name)) out.push(files[i]);
+    }
+    return out;
+  }
+
+  /** True when the drag is carrying files at all (not text or a link). */
+  function dragHasFiles(e) {
+    var t = e.dataTransfer && e.dataTransfer.types;
+    if (!t) return false;
+    return Array.prototype.indexOf.call(t, 'Files') !== -1;
+  }
+
+  function dropHint(on) {
+    $('drop-hint').hidden = !on;
+    $('panel-tracks').classList.toggle('dragging', !!on);
+  }
+
+  var panelTracks = $('panel-tracks');
+
+  panelTracks.addEventListener('dragenter', function (e) {
+    if (!signedIn || !dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    dropHint(true);
+  });
+  panelTracks.addEventListener('dragover', function (e) {
+    if (!signedIn || !dragHasFiles(e)) return;
+    e.preventDefault();                       // without this the drop never fires
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  panelTracks.addEventListener('dragleave', function () {
+    if (!signedIn) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) dropHint(false);
+  });
+  panelTracks.addEventListener('drop', function (e) {
+    if (!signedIn || !dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    dropHint(false);
+    var files = gpxFilesFrom(e.dataTransfer);
+    if (!files.length) { toast('Only .gpx files can be added.'); return; }
+    uploadDropped(files);
+  });
+
+  // Anywhere else, a dropped file would navigate away from the page and lose
+  // whatever was on screen.
+  ['dragover', 'drop'].forEach(function (type) {
+    window.addEventListener(type, function (e) {
+      if (dragHasFiles(e) && !panelTracks.contains(e.target)) e.preventDefault();
+    });
+  });
+
+  /** Upload dropped files one at a time, reporting as it goes. */
+  function uploadDropped(files) {
+    var status = $('drop-status');
+    var text = $('drop-text');
+    var bar = $('drop-bar');
+    status.hidden = false;
+
+    var added = [], failed = [];
+    var step = function (i) {
+      if (i >= files.length) return Promise.resolve();
+      text.textContent = files.length > 1
+        ? 'Uploading ' + (i + 1) + ' of ' + files.length + ' — ' + files[i].name
+        : 'Uploading ' + files[i].name;
+      bar.style.width = '0%';
+      return uploadFile(files[i], function (pct) { bar.style.width = pct + '%'; })
+        .then(function (track) { added.push(track); })
+        .catch(function (err) { failed.push(files[i].name + ' — ' + err.message); })
+        .then(function () { return step(i + 1); });
+    };
+
+    return step(0)
+      .then(function () { return loadCatalogue(); })
+      .then(function () {
+        status.hidden = true;
+        text.textContent = '\u00a0';
+        bar.style.width = '0%';
+        if (added.length === 1 && !failed.length) {
+          selectTrack(added[0].id, true);
+          toast('Added \u201c' + (added[0].name || added[0].id) + '\u201d');
+        } else if (added.length) {
+          toast(added.length + ' tracks added'
+            + (failed.length ? ', ' + failed.length + ' failed' : ''));
+        }
+        if (failed.length) {
+          toast(failed.length === 1 ? failed[0] : failed.length + ' files were refused: ' + failed[0], 7000);
+        }
+      });
+  }
 
   /* ------------------------------------------------------------------ *
    * Boot

@@ -71,6 +71,9 @@ duration.
 
 ### Trip information
 
+A small **GitHub** link sits in the bottom-right corner of this panel, pointing
+at the source repository.
+
 Selecting a track opens the info panel:
 
 - Distance, duration, lowest / highest point, total ascent / descent, and the
@@ -154,6 +157,14 @@ The **Upload** button opens a dialog: sign in once with the collection password,
 then choose a `.gpx` file. There is a progress bar for large files, and the new
 track is selected on the map as soon as it lands. Re-uploading a track that is
 already in the collection is refused rather than duplicated.
+
+Once signed in you can also **drag `.gpx` files straight onto the track list** —
+the panel highlights while you drag, and files upload one after another with a
+progress strip along the bottom. Drop several at once and they queue; anything
+that is not a `.gpx`, or that the validator refuses, is reported and skipped
+without stopping the rest. Both routes run the same code, so a dropped file gets
+exactly the checks a dialog upload gets. Dropping a file anywhere else on the
+page is ignored rather than letting the browser navigate away from the site.
 
 ### On a phone
 

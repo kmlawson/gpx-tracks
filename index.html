@@ -56,6 +56,14 @@
     <p id="pick-hint" class="pick-hint" hidden>Right-click a selected track to edit them together · <button type="button" class="linkbtn" id="pick-clear">clear</button></p>
     <ul id="track-list" class="track-list"></ul>
     <p id="list-empty" class="empty" hidden>No tracks match.</p>
+    <!-- Shown over the list while files are dragged across it. -->
+    <div id="drop-hint" class="drop-hint" hidden aria-hidden="true">
+      <span>Drop .gpx files to add them</span>
+    </div>
+    <div class="drop-status" id="drop-status" hidden>
+      <p class="readout" id="drop-text">&nbsp;</p>
+      <div class="progress" id="drop-progress"><div class="bar" id="drop-bar"></div></div>
+    </div>
   </aside>
 
   <!-- Map -->
@@ -88,6 +96,9 @@
         <a id="view-link" href="#" target="_blank" rel="noopener">view raw</a>
       </p>
     </div>
+    <p class="panel-foot">
+      <a href="https://github.com/kmlawson/gpx-tracks" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </p>
   </aside>
 </main>
 
