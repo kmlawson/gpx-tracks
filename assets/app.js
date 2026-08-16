@@ -9,7 +9,7 @@
    * "it is broken" reports whose cause was invisible, so each carries the same
    * stamp and the page says plainly when they disagree.
    */
-  var APP_VERSION = '2026.08.16.8';
+  var APP_VERSION = '2026.08.16.9';
 
   var API_LIST = 'api/list.php';
   var FALLBACK_LIST = 'data/index.json';
@@ -60,13 +60,22 @@
     // when the layout crosses the breakpoint. Path._clickTolerance() reads it
     // on every hit test, so updating it takes effect immediately.
     renderer: vectorRenderer,
-    // Half steps for fitted views only. Whole levels are a blunt instrument for
-    // fitting a country: the opening view needs a little more than zoom 7 shows
-    // and would otherwise drop to 6, which is the whole British Isles and most
-    // of the North Sea. zoomDelta keeps the +/- buttons stepping by one.
-    zoomSnap: 0.5,
+    /**
+     * Whole levels, because tiles only exist at whole levels.
+     *
+     * At a half step Leaflet fetches the nearest whole level and scales it, and
+     * a scaled tile covers less of the screen — so the same view costs 42 tiles
+     * instead of 20, and is soft rather than sharp. Worse, a half step is
+     * sticky: fitting a track landed on 14.5, and every step after that stayed
+     * on a half (15.5, 16.5), so the map never came back to a sharp level.
+     * Measured over zoom 12 to 14: half steps cost 2.9x the tiles, 2.6x the
+     * bytes and 2.6x as long spent half-drawn.
+     *
+     * homeView() borrows a half step for the opening fit alone — see there.
+     */
+    zoomSnap: 1,
     zoomDelta: 1
-  }).setView(EDINBURGH, 6.5);
+  }).setView(EDINBURGH, 7);
 
   /**
    * Derived from the map's real size rather than hard-coded, so the same view
@@ -75,29 +84,67 @@
    * as it can be without losing the north of the country.
    */
   function homeView() {
+    /**
+     * The one place a half step earns its keep. Fitting the country needs a
+     * little more than zoom 7 shows, and a whole level would drop to 6 — the
+     * British Isles and most of the North Sea. zoomSnap has to be relaxed for
+     * both calls, because getBoundsZoom and setView each round to it.
+     *
+     * It is put straight back, so this is a still opening view rather than a
+     * fractional level the map then zooms away from: the first step from 6.5
+     * lands on a whole level and stays there.
+     */
+    map.options.zoomSnap = 0.5;
     map.setView(EDINBURGH, map.getBoundsZoom(L.latLngBounds(HOME_BOUNDS)), { animate: false });
+    map.options.zoomSnap = 1;
   }
 
   // Straight away, so the opening view is right on the first paint rather than
   // settling into place once the catalogue has been fetched.
   homeView();
 
-  // maxNativeZoom lets Leaflet upscale instead of requesting tiles a server
-  // does not have — that is what otherwise produces 404s when you zoom right in.
+  /**
+   * Options every base layer shares.
+   *
+   * updateWhenZooming false stops Leaflet rebuilding the tile grid part-way
+   * through a zoom animation: the old level stays put until the new one is
+   * ready, instead of the grid churning while the view is still moving.
+   *
+   * keepBuffer is Leaflet's default of 2 raised to 3 — one more ring of tiles
+   * held either side of the viewport, so panning and zooming out reveal tiles
+   * already fetched rather than blank squares waiting on the network.
+   */
+  function tiles(url, extra) {
+    var o = { maxZoom: 19, maxNativeZoom: 19, updateWhenZooming: false, keepBuffer: 3 };
+    for (var k in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, k)) o[k] = extra[k];
+    }
+    return L.tileLayer(url, o);
+  }
+
+  /**
+   * No {s} anywhere. Sharding across a/b/c was how you beat HTTP/1.1's six
+   * connections per host; over HTTP/2 and HTTP/3 one connection multiplexes the
+   * lot, so splitting the tiles across four hostnames just buys four sets of
+   * DNS, TCP and TLS. Measured: Carto had the quickest individual tiles of the
+   * four and still settled slower than OSM, purely because its 23 tiles arrived
+   * over four connections instead of one.
+   *
+   * maxNativeZoom lets Leaflet upscale instead of requesting tiles a server
+   * does not have — that is what otherwise produces 404s when you zoom right in.
+   */
   var layers = {
-    'Terrain (OpenTopoMap)': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, maxNativeZoom: 17, subdomains: 'abc',
+    'Terrain (OpenTopoMap)': tiles('https://tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxNativeZoom: 17,
       attribution: OSM_ATTR + ' | <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
     }),
-    'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19, maxNativeZoom: 19,
+    'Satellite (Esri)': tiles('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics'
     }),
-    'OSM standard': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, maxNativeZoom: 19, attribution: OSM_ATTR
+    'OSM standard': tiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: OSM_ATTR
     }),
-    'Light (Carto)': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, maxNativeZoom: 19, subdomains: 'abcd',
+    'Light (Carto)': tiles('https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: OSM_ATTR + ' &copy; <a href="https://carto.com/attributions">CARTO</a>'
     })
   };
@@ -167,7 +214,14 @@
 
   var saved = null;
   try { saved = localStorage.getItem('gpx.layer'); } catch (e) { /* private mode */ }
-  var initial = (saved && layers[saved]) ? saved : 'Terrain (OpenTopoMap)';
+  /**
+   * OSM standard by default: measured cold over the same ground, it settles in
+   * 154 ms against OpenTopoMap's 475 ms — a third of the time spent half-drawn.
+   * It is one host speaking HTTP/3, so a screenful of tiles arrives as a batch,
+   * and its tiles are 29 KB against 36 KB. Terrain is still a click away for
+   * anyone who wants contours, and a saved choice always wins.
+   */
+  var initial = (saved && layers[saved]) ? saved : 'OSM standard';
   layers[initial].addTo(map);
   L.control.layers(layers, {}, { position: 'topright' }).addTo(map);
 
