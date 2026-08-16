@@ -17,7 +17,14 @@ DirectoryIndex index.html
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
-  Header always set Referrer-Policy "no-referrer"
+  # Not "no-referrer". OpenStreetMap's tile usage policy requires a Referer to
+  # identify the site using its volunteer servers, and answers a request without
+  # one with a 403 tile reading "Referer is required" — so no-referrer silently
+  # broke the OSM layer. This sends the origin (https://muninn.net/) on a
+  # cross-origin request and nothing on a downgrade to http, so the tile servers
+  # learn which site is asking but never which track anyone is looking at. The
+  # tile layers also set it per-image in app.js, for hosting without this file.
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
   Header always set Strict-Transport-Security "max-age=31536000" env=HTTPS
 

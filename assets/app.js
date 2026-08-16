@@ -9,7 +9,7 @@
    * "it is broken" reports whose cause was invisible, so each carries the same
    * stamp and the page says plainly when they disagree.
    */
-  var APP_VERSION = '2026.08.16.9';
+  var APP_VERSION = '2026.08.16.10';
 
   var API_LIST = 'api/list.php';
   var FALLBACK_LIST = 'data/index.json';
@@ -115,7 +115,20 @@
    * already fetched rather than blank squares waiting on the network.
    */
   function tiles(url, extra) {
-    var o = { maxZoom: 19, maxNativeZoom: 19, updateWhenZooming: false, keepBuffer: 3 };
+    var o = {
+      maxZoom: 19, maxNativeZoom: 19, updateWhenZooming: false, keepBuffer: 3,
+      /**
+       * OpenStreetMap's tile policy requires a Referer identifying the site, and
+       * serves a 403 "Referer is required" tile without one. The .htaccess sets
+       * the same policy for the whole page; this repeats it on each tile image
+       * so the map still works when hosted without that file — on nginx, or on
+       * anything sending Referrer-Policy: no-referrer of its own.
+       *
+       * The origin goes out, never the path, so a tile server is told which
+       * site is asking but not which track is on screen.
+       */
+      referrerPolicy: 'strict-origin-when-cross-origin'
+    };
     for (var k in extra) {
       if (Object.prototype.hasOwnProperty.call(extra, k)) o[k] = extra[k];
     }
