@@ -1228,8 +1228,9 @@ function gpx_rebuild(array $data, string $name, ?int $timestamp): string
 {
     $w = new XMLWriter();
     $w->openMemory();
-    $w->setIndent(true);
-    $w->setIndentString('  ');
+    // No indentation. It is roughly 30 bytes per point of leading whitespace in
+    // a file that is read by software, and it is a fifth of the stored size.
+    $w->setIndent(false);
     $w->startDocument('1.0', 'UTF-8');
     $w->startElement('gpx');
     $w->writeAttribute('version', '1.1');
@@ -1300,14 +1301,23 @@ function gpx_rebuild(array $data, string $name, ?int $timestamp): string
     return $w->outputMemory();
 }
 
+/**
+ * Six decimal places: about 11 cm, which is far finer than any GPS receiver.
+ *
+ * Five was tried and is wrong. Its grid is 1.1 m, but a track recorded at 1 Hz
+ * on foot has points about 0.85 m apart — below the grid — so rounding turns a
+ * smooth line into a staircase and *inflates* the measured distance by 7% on a
+ * real 8.8 km walk. Six costs 0.17%, which is 15 m over the same track.
+ */
 function fmt_coord(float $v): string
 {
-    return rtrim(rtrim(number_format($v, 7, '.', ''), '0'), '.');
+    return rtrim(rtrim(number_format($v, 6, '.', ''), '0'), '.');
 }
 
+/** One decimal. GPS altitude is not accurate to the centimetre. */
 function fmt_ele(float $v): string
 {
-    return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+    return rtrim(rtrim(number_format($v, 1, '.', ''), '0'), '.');
 }
 
 /* ------------------------------------------------------------------ *
@@ -1499,6 +1509,10 @@ function ingest_gpx(string $raw, string $originalName, string $source): array
             'activity'    => $activity,
             'bytes'       => strlen($clean),
             'sha256'      => $digest,
+            // Stamp what wrote it, so a later format change can find the
+            // tracks that predate it — and, just as importantly, leave alone
+            // the ones that do not.
+            'fmt'         => GPX_FORMAT,
         ] + $stats;
 
         $json = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -1540,6 +1554,104 @@ function store_delete(string $id): bool
         }
         store_reindex(true);
         return $gone;
+    } finally {
+        store_unlock($lock);
+    }
+}
+
+/**
+ * The stored-file format. Bumped when gpx_rebuild() starts producing different
+ * bytes for the same input, so existing tracks can be brought up to date
+ * without guessing which ones need it.
+ *
+ *   1  indented, 7-decimal coordinates, 2-decimal elevation
+ *   2  no indentation, 6 decimals, 1-decimal elevation  (about 27% smaller)
+ */
+const GPX_FORMAT = 2;
+
+/** @return array<string> ids of tracks stored in an older format */
+function store_stale_ids(): array
+{
+    ensure_dirs();
+    $out = [];
+    foreach (glob(META_DIR . '/*.json') ?: [] as $file) {
+        $id = basename($file, '.json');
+        if (!valid_id($id) || !is_file(gpx_path($id))) {
+            continue;
+        }
+        $meta = json_decode((string)file_get_contents($file), true);
+        if (!is_array($meta)) {
+            continue;
+        }
+        if ((int)($meta['fmt'] ?? 1) < GPX_FORMAT) {
+            $out[] = $id;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Rewrite one stored track in the current format.
+ *
+ * The file is re-parsed and re-serialised by the same pair of functions an
+ * upload goes through, so this cannot introduce anything a fresh upload would
+ * have rejected. Only the bytes change: the name, the dates and every computed
+ * statistic are left exactly as they are, because they were derived from the
+ * original full-precision data and re-deriving them now would be a downgrade.
+ *
+ * @throws GpxRejected
+ */
+function store_recompact(string $id): array
+{
+    if (!valid_id($id)) {
+        throw new InvalidArgumentException('Invalid track id');
+    }
+    $lock = store_lock();
+    try {
+        $metaFile = meta_path($id);
+        $gpxFile  = gpx_path($id);
+        if (!is_file($metaFile) || !is_file($gpxFile)) {
+            throw new GpxRejected('No such track');
+        }
+        $meta = json_decode((string)file_get_contents($metaFile), true);
+        if (!is_array($meta) || ($meta['id'] ?? '') !== $id) {
+            throw new GpxRejected('Track metadata is unreadable');
+        }
+
+        $raw = @file_get_contents($gpxFile, false, null, 0, MAX_STORED_BYTES + 1);
+        if ($raw === false || strlen($raw) > MAX_STORED_BYTES) {
+            throw new GpxRejected('Could not read the stored track');
+        }
+        $data = gpx_parse($raw);
+        $name = (string)($meta['name'] ?? '');
+        if ($name !== '' && isset($data['tracks'][0]) && is_array($data['tracks'][0])) {
+            $data['tracks'][0]['name'] = $name;
+        }
+        $ts = $data['metaTime'] ?? null;
+        if ($ts === null && !empty($meta['date'])) {
+            $ts = strtotime((string)$meta['date']) ?: null;
+        }
+        $clean = gpx_rebuild($data, $name, $ts);
+        unset($data, $raw);
+
+        if (strlen($clean) > MAX_STORED_BYTES) {
+            throw new GpxRejected('Rebuilt track is too large to store');
+        }
+        gpx_verify_clean($clean);
+
+        if (!atomic_write($gpxFile, $clean, 0644)) {
+            throw new RuntimeException('Could not rewrite the track file');
+        }
+        $meta['bytes']  = strlen($clean);
+        $meta['sha256'] = hash('sha256', $clean);
+        $meta['fmt']    = GPX_FORMAT;
+
+        $json = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($json === false || !atomic_write($metaFile, $json)) {
+            throw new RuntimeException('Could not write the track metadata');
+        }
+        store_reindex(true);
+        return $meta;
     } finally {
         store_unlock($lock);
     }

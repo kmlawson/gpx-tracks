@@ -1,4 +1,5 @@
 :root {
+  --app-version: "2026.08.16.4";
   --bg: #f6f7f9;
   --panel: #ffffff;
   --ink: #1b1f24;
@@ -526,6 +527,15 @@ body { display: flex; flex-direction: column; }
 
   .topbtn .lbl { display: none; }
   #btn-upload .lbl { display: inline; }
+  /* A track is selected: the screen is the map, and the bar carries only the
+     two things you still need — back to everything, and this track's details. */
+  body.track-focus #btn-tracks,
+  body.track-focus .home,
+  body.track-focus #btn-upload,
+  body.track-focus #panel-tracks { display: none !important; }
+  body.track-focus .track-title { max-width: 50vw; }
+  #btn-showall-top { font-size: 13px; }
+
   /* There is no Option key to reveal it here, so it stays on screen — but in
      the same plain style as the other buttons rather than solid accent, so it
      does not dominate a bar that is mostly for reading. */

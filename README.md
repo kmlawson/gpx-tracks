@@ -23,6 +23,13 @@ Four base layers, switchable from the control in the top right:
 | **OSM standard** | openstreetmap.org | to z19 |
 | **Light** | Carto Positron — a quiet backdrop | to z19 |
 
+A tile request occasionally stalls: no error, no image, just a white square that
+never resolves, because nothing fires to prompt a retry. Every tile carries a
+watchdog, cancelled the moment it loads or fails, and is retried up to twice.
+The retry uses a slightly different URL by necessity — while a request is
+pending, re-assigning the same `src`, or removing the attribute and putting it
+back, issues no new request at all. That was measured rather than assumed.
+
 Each layer declares its deepest real tile level, so zooming further upscales the
 last tile it has instead of asking for one that does not exist. Zooming from z5
 to z19 on all four layers produces no failed tile requests. Your choice of layer
@@ -99,6 +106,28 @@ an undated track is just `Name - 10.9km.gpx`. A date carried in the track's own
 name is used for the prefix and not repeated in the middle. The server sets this
 through `Content-Disposition`, which is what browsers honour; the page computes
 the identical name for the static fallback when there is no PHP.
+
+### Keeping the stored files small
+
+Tracks are stored without indentation, with coordinates to six decimal places
+(about 11 cm) and elevation to one — roughly 27% smaller than the original
+format once compressed.
+
+Five decimal places was tried and rejected: its 1.1 m grid is *coarser* than the
+0.85 m spacing of a track recorded at 1 Hz on foot, which turns a smooth line
+into a staircase and inflates the measured distance by 7% over a real 8.8 km
+walk. Six costs 0.17%, or 15 m over the same track.
+
+Each stored file records the format that wrote it. When the format changes, the
+Upload dialog offers to **rebuild** the tracks that predate it — one per request,
+with progress, so a large library cannot time the server out. Rebuilding
+re-parses and re-serialises through the same pipeline an upload uses and updates
+the size and checksum; the name, dates and every computed statistic are left
+alone, because those were derived from the original full-precision data.
+
+Until a track has been rebuilt its stored checksum belongs to the old format, so
+re-uploading that exact track will not be recognised as a duplicate. Rebuilding
+puts that right.
 
 ### Managing tracks
 
@@ -217,6 +246,11 @@ map. Tap targets are finger-sized, text inputs are 16px so iOS does not zoom on
 focus, and the layout respects the notch/home-indicator safe areas.
 
 Light and dark colour schemes follow the device setting.
+
+Selecting a track clears the screen for the map: the track list, the site name,
+the Tracks button and the Upload button all go, leaving a bar with just **Show
+all** and **Trip info**. Show all moves into that bar, because the panel header
+it normally lives in is no longer on screen.
 
 Tap targets are finger-sized throughout (44px for the close buttons, and no
 control under 32px), the layout never scrolls sideways down to a 320px screen,
@@ -466,6 +500,16 @@ add_header X-Content-Type-Options nosniff always;
 add_header X-Frame-Options DENY always;
 add_header Referrer-Policy no-referrer always;
 add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://server.arcgisonline.com https://services.arcgisonline.com https://*.basemaps.cartocdn.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'" always;
+
+# GPX is XML and compresses about ten to one. This is the single biggest thing
+# you can do for how quickly a track appears.
+gzip              on;
+gzip_vary         on;
+gzip_comp_level   6;
+gzip_min_length   1024;
+gzip_proxied      any;
+gzip_types        application/gpx+xml application/json application/javascript
+                  text/css text/plain text/xml image/svg+xml;
 
 # No build step, so app.js keeps its name: revalidate rather than serve a stale
 # copy after an upload.

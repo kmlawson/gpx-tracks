@@ -3,6 +3,14 @@
 (function () {
   'use strict';
 
+  /**
+   * These three files are uploaded together and only work together. Getting a
+   * new index.html with an old app.js or style.css has produced three separate
+   * "it is broken" reports whose cause was invisible, so each carries the same
+   * stamp and the page says plainly when they disagree.
+   */
+  var APP_VERSION = '2026.08.16.4';
+
   var API_LIST = 'api/list.php';
   var FALLBACK_LIST = 'data/index.json';
   var MOBILE = function () { return window.matchMedia('(max-width: 800px)').matches; };
@@ -81,6 +89,66 @@
   window.gpxMap = map;        // handy for debugging / automated checks
   window.gpxLayers = layers;
 
+  /* ------------------------------------------------------------------ *
+   * Tiles that never arrive
+   *
+   * A tile request occasionally stalls: no error, no image, just a white
+   * square that stays white however long you wait, because nothing will ever
+   * fire to tell the map to try again. Each tile therefore gets a watchdog,
+   * cancelled the moment it loads or fails, and a bounded number of retries.
+   * ------------------------------------------------------------------ */
+
+  var TILE_TIMEOUT = 9000;   // a stalled request looks exactly like a slow one
+  var TILE_RETRIES = 2;
+
+  function retryTile(tile) {
+    // Panned or zoomed away: Leaflet has already discarded it.
+    if (!tile || !tile.parentNode || !tile.src) return;
+    var n = tile._gpxRetries || 0;
+    if (n >= TILE_RETRIES) return;
+    tile._gpxRetries = n + 1;
+
+    var src = tile._gpxSrc || tile.src;
+    tile._gpxSrc = src;
+    setTimeout(function () {
+      if (!tile.parentNode) return;
+      // The URL has to differ. Re-assigning the same src does nothing at all
+      // while a request for it is still pending — measured, not assumed — and
+      // removing the attribute first does not help either, so the stalled
+      // request would simply carry on being stalled. A retry counter is enough
+      // to make it a new URL, and retries are rare enough not to matter to the
+      // tile provider's cache.
+      tile.src = src + (src.indexOf('?') === -1 ? '?' : '&') + 'r=' + (n + 1);
+    }, 500 * (n + 1));
+  }
+
+  function watchTiles(layer) {
+    layer.on('tileloadstart', function (e) {
+      clearTimeout(e.tile._gpxTimer);
+      e.tile._gpxTimer = setTimeout(function () { retryTile(e.tile); }, TILE_TIMEOUT);
+    });
+    layer.on('tileload', function (e) { clearTimeout(e.tile._gpxTimer); });
+    layer.on('tileunload', function (e) { clearTimeout(e.tile._gpxTimer); });
+    layer.on('tileerror', function (e) {
+      clearTimeout(e.tile._gpxTimer);
+      retryTile(e.tile);
+    });
+  }
+
+  // Only complain if a layer is clearly failing wholesale, and never spam.
+  var tileErrors = 0, tileWarned = false;
+  Object.keys(layers).forEach(function (name) {
+    watchTiles(layers[name]);
+    layers[name].on('tileerror', function () {
+      tileErrors++;
+      if (tileErrors > 24 && !tileWarned) {
+        tileWarned = true;
+        toast('Map tiles are not loading — check your connection or try another base layer.');
+      }
+    });
+    layers[name].on('tileload', function () { tileErrors = Math.max(0, tileErrors - 1); });
+  });
+
   var saved = null;
   try { saved = localStorage.getItem('gpx.layer'); } catch (e) { /* private mode */ }
   var initial = (saved && layers[saved]) ? saved : 'Terrain (OpenTopoMap)';
@@ -90,20 +158,6 @@
 
   map.on('baselayerchange', function (e) {
     try { localStorage.setItem('gpx.layer', e.name); } catch (err) { /* ignore */ }
-  });
-
-  // Tile hiccups happen (transient network). Only complain if a layer is
-  // clearly failing wholesale, and never spam the user.
-  var tileErrors = 0, tileWarned = false;
-  Object.keys(layers).forEach(function (name) {
-    layers[name].on('tileerror', function () {
-      tileErrors++;
-      if (tileErrors > 24 && !tileWarned) {
-        tileWarned = true;
-        toast('Map tiles are not loading — check your connection or try another base layer.');
-      }
-    });
-    layers[name].on('tileload', function () { tileErrors = Math.max(0, tileErrors - 1); });
   });
 
   /* ------------------------------------------------------------------ *
@@ -394,6 +448,7 @@
       lastMobile = MOBILE();
       layoutDefaults();
       showUploadBtn(altHeld);   // the rule differs either side of the breakpoint
+      applyMobileChrome();
     }
     map.invalidateSize();
     if (current) drawProfile();
@@ -562,6 +617,7 @@
 
     $('list-empty').hidden = shown.length !== 0;
     $('btn-showall').hidden = !current;
+    applyMobileChrome();
 
     var n = pickedIds().length;
     $('track-count').textContent = n
@@ -1189,7 +1245,11 @@
     // A phone has no Option key, so hiding it there would hide the only way
     // in to signing in, uploading and editing. It stays, toned down in CSS to
     // the same weight as the other buttons.
-    if (MOBILE()) { $('btn-upload').hidden = false; return; }
+    if (MOBILE()) {
+      // …unless a track is selected, where the bar is deliberately bare.
+      $('btn-upload').hidden = !!current;
+      return;
+    }
     // Never take it away while the dialog it opened is still on screen.
     if (!on && !$('modal').hidden) return;
     $('btn-upload').hidden = !on;
@@ -1225,11 +1285,13 @@
     $('upload-form').hidden = !authed;
     if (!authed) {
       $('incoming').hidden = true;
+      $('recompact').hidden = true;
       $('manage').hidden = true;
       editorOpen(false);
       $('btn-manage').setAttribute('aria-expanded', 'false');
     } else {
       checkIncoming();
+      checkRecompact();
     }
   }
 
@@ -1334,6 +1396,85 @@
   }
 
   $('incoming-go').addEventListener('click', runIncoming);
+
+  /* ------------------------------------------------------------------ *
+   * Rebuilding stored tracks in the current file format
+   * ------------------------------------------------------------------ */
+
+  function checkRecompact() {
+    return fetch('api/rebuild.php', {
+      credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' }
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var n = d && d.ok ? d.pending : 0;
+        $('recompact').hidden = !n;
+        if (n) {
+          $('recompact-hint').textContent = n === 1
+            ? '1 track is stored in the older, larger format.'
+            : n + ' tracks are stored in the older, larger format.';
+          $('recompact-go').disabled = false;
+          $('recompact-go').textContent = n === 1 ? 'Rebuild it' : 'Rebuild them';
+        }
+        return n;
+      })
+      .catch(function () { $('recompact').hidden = true; return 0; });
+  }
+
+  /** One track per request, so a big library cannot time the server out. */
+  function runRecompact() {
+    var go = $('recompact-go');
+    var bar = $('recompact-bar');
+    var status = $('recompact-status');
+    var total = 0, done = 0, saved = 0;
+
+    go.disabled = true;
+    status.hidden = false;
+    $('recompact-progress').hidden = false;
+    bar.style.width = '0%';
+
+    function step() {
+      var body = new FormData();
+      body.append('action', 'recompact');
+      body.append('csrf', csrf || '');
+      return fetch('api/rebuild.php', { method: 'POST', body: body, credentials: 'same-origin' })
+        .then(function (r) {
+          return r.json().then(function (d) {
+            if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+            return d;
+          });
+        })
+        .then(function (d) {
+          if (!d.id) return false;
+          done++;
+          saved += Math.max(0, (d.before || 0) - (d.after || 0));
+          if (total === 0) total = done + d.remaining;
+          bar.style.width = Math.round((done / Math.max(total, 1)) * 100) + '%';
+          status.textContent = 'Rebuilt ' + done + ' of ' + total + ' — ' + (d.name || d.id);
+          return d.remaining > 0;
+        });
+    }
+
+    function loop() {
+      return step().then(function (more) { return more ? loop() : null; });
+    }
+
+    return loop()
+      .then(function () { return loadCatalogue(); })
+      .then(function () {
+        var mb = saved / 1048576;
+        status.textContent = done + ' track' + (done === 1 ? '' : 's') + ' rebuilt, '
+          + (mb >= 0.1 ? mb.toFixed(1) + ' MB' : Math.round(saved / 1024) + ' KB') + ' saved.';
+        bar.style.width = '100%';
+        return checkRecompact();
+      })
+      .catch(function (e) {
+        status.textContent = 'Stopped: ' + e.message;
+        go.disabled = false;
+      });
+  }
+
+  $('recompact-go').addEventListener('click', runRecompact);
 
   /* ------------------------------------------------------------------ *
    * Manage: rename and delete
@@ -1731,6 +1872,22 @@
   }
 
   $('btn-showall').addEventListener('click', showAll);
+  $('btn-showall-top').addEventListener('click', showAll);
+
+  /**
+   * With a track selected on a phone, the screen belongs to the map: the track
+   * list, the site name and the way in to more of them are all noise until you
+   * want another track, and "Show all" is the way back to wanting one.
+   */
+  function applyMobileChrome() {
+    var focused = MOBILE() && !!current;
+    document.body.classList.toggle('track-focus', focused);
+    $('btn-showall-top').hidden = !focused;
+    if (focused) panelOpen('panel-tracks', false);
+    // Settle it in both directions: on the way out of focus the button has to
+    // come back, and only re-running the rule knows whether it should.
+    showUploadBtn(altHeld);
+  }
   $('pick-clear').addEventListener('click', clearPicked);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && anyPicked() && $('editor').hidden) clearPicked();
@@ -1994,6 +2151,29 @@
   /* ------------------------------------------------------------------ *
    * Boot
    * ------------------------------------------------------------------ */
+
+  /**
+   * Check the three files match before anything else runs, so a mismatched
+   * upload announces itself instead of surfacing later as an unexplained
+   * missing button, an unstyled link or a map in the wrong place.
+   */
+  (function checkAssetVersions() {
+    var meta = document.querySelector('meta[name="app-version"]');
+    var html = meta ? meta.getAttribute('content') : null;
+    var css = getComputedStyle(document.documentElement)
+      .getPropertyValue('--app-version').trim().replace(/^["']|["']$/g, '');
+    var stale = [];
+    if (html !== APP_VERSION) stale.push('index.html (' + (html || 'no stamp') + ')');
+    if (css !== APP_VERSION) stale.push('assets/style.css (' + (css || 'no stamp') + ')');
+    if (!stale.length) return;
+
+    var msg = 'Out of date: ' + stale.join(' and ')
+      + ' — assets/app.js is ' + APP_VERSION + '. Upload index.html, assets/app.js'
+      + ' and assets/style.css together, then reload.';
+    // console for you, toast for whoever is looking at it.
+    if (window.console && console.warn) console.warn(msg);
+    setTimeout(function () { toast(msg, 12000); }, 1200);
+  }());
 
   cleanUrl();
   layoutDefaults();
