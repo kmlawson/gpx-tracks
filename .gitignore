@@ -1,0 +1,27 @@
+# The site password. Generated locally by tools/gpxadmin.php and uploaded by
+# hand — it must never be in version control, even as a hash.
+api/credentials.php
+
+# The library itself: tracks, their metadata, the catalogue, sessions, rate
+# limit counters, the drop folder. All of it is personal data and all of it is
+# created on demand by the application, so none of it belongs in the repo.
+data/
+
+# Original, unsanitised exports dropped in the project root.
+*.gpx
+
+# One-off script output.
+scripts/temp-scripts/*.log
+scripts/temp-scripts/*.backup.json
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors and tooling
+.vscode/
+.idea/
+*.swp
+node_modules/

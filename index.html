@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://server.arcgisonline.com https://services.arcgisonline.com https://*.basemaps.cartocdn.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'">
+<title>GPX Tracks</title>
+<link rel="stylesheet" href="assets/leaflet/leaflet.css">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E🗺%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+<header id="topbar">
+  <button id="btn-tracks" class="topbtn" type="button" aria-expanded="false" aria-controls="panel-tracks">
+    <span class="ico" aria-hidden="true">☰</span><span class="lbl">Tracks</span>
+  </button>
+  <h1 id="title">GPX Tracks</h1>
+  <button id="btn-info" class="topbtn" type="button" aria-expanded="false" aria-controls="panel-info" disabled>
+    <span class="ico" aria-hidden="true">📈</span><span class="lbl">Trip info</span>
+  </button>
+  <button id="btn-upload" class="topbtn" type="button" aria-haspopup="dialog">
+    <span class="ico" aria-hidden="true">⬆</span><span class="lbl">Upload</span>
+  </button>
+</header>
+
+<main id="stage">
+  <!-- Track list -->
+  <aside id="panel-tracks" class="panel" aria-label="Available tracks">
+    <div class="panel-head">
+      <h2>Tracks <span id="track-count" class="count"></span></h2>
+      <button id="btn-showall" class="rowbtn showall" type="button" hidden>Show all</button>
+      <button class="panel-close" type="button" data-close="panel-tracks" aria-label="Close track list">✕</button>
+    </div>
+    <div class="controls">
+      <label class="sr-only" for="search">Filter tracks</label>
+      <input id="search" type="search" placeholder="Search by name, date, activity…" autocomplete="off" spellcheck="false">
+      <div class="sortrow">
+        <label class="sr-only" for="sort">Sort by</label>
+        <select id="sort">
+          <option value="date">Date</option>
+          <option value="distance">Distance</option>
+          <option value="elevation">Elevation spread</option>
+          <option value="duration">Duration</option>
+          <option value="name">Name</option>
+        </select>
+        <button id="sort-dir" type="button" title="Toggle sort direction" aria-label="Toggle sort direction">↓</button>
+      </div>
+      <!-- Populated from the catalogue; hidden while nothing is tagged. -->
+      <label class="sr-only" for="filter-tag">Filter by country or tag</label>
+      <select id="filter-tag" hidden>
+        <option value="">All tracks</option>
+      </select>
+    </div>
+    <p id="pick-hint" class="pick-hint" hidden>Right-click a selected track to edit them together · <button type="button" class="linkbtn" id="pick-clear">clear</button></p>
+    <ul id="track-list" class="track-list"></ul>
+    <p id="list-empty" class="empty" hidden>No tracks match.</p>
+  </aside>
+
+  <!-- Map -->
+  <div id="map" role="application" aria-label="Map"></div>
+
+  <!-- Shown over the map while a track is being fetched and drawn -->
+  <div id="loading" class="loading" role="status" aria-live="polite" hidden>
+    <span class="spinner" aria-hidden="true"></span>
+    <span id="loading-text">Loading track…</span>
+  </div>
+
+  <!-- Trip info -->
+  <aside id="panel-info" class="panel panel-right" aria-label="Trip information">
+    <div class="panel-head">
+      <h2 id="info-name">Trip</h2>
+      <button class="panel-close" type="button" data-close="panel-info" aria-label="Close trip info">✕</button>
+    </div>
+    <div id="info-body">
+      <dl class="stats" id="stats"></dl>
+      <section class="profile-wrap">
+        <h3>Elevation profile</h3>
+        <div id="profile" class="profile"></div>
+        <p id="profile-readout" class="readout">&nbsp;</p>
+      </section>
+
+      <!-- This track's tags, each one a filter. -->
+      <section id="tag-row" class="tag-row" hidden aria-label="Tags"></section>
+      <p class="dl">
+        <a id="dl-link" class="dlmain" href="#" download>⤓ Download GPX</a>
+        <a id="view-link" href="#" target="_blank" rel="noopener">view raw</a>
+      </p>
+    </div>
+  </aside>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Upload dialog -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="panel-head">
+      <h2 id="modal-title">Upload a GPX</h2>
+      <button class="panel-close" type="button" id="modal-close" aria-label="Close">✕</button>
+    </div>
+
+    <form id="login-form" class="modal-body" autocomplete="on">
+      <p class="hint">Uploading requires the collection password.</p>
+      <label for="login-pass">Password</label>
+      <input id="login-pass" name="password" type="password" autocomplete="current-password" required maxlength="4096">
+      <button type="submit" class="primary">Sign in</button>
+      <p class="err" id="login-err" hidden></p>
+    </form>
+
+    <!-- Files dropped into data/incoming/ by hand. Signed-in only. -->
+    <section id="incoming" class="modal-body incoming" hidden>
+      <p class="hint" id="incoming-hint"></p>
+      <button type="button" class="primary" id="incoming-go">Index them</button>
+      <div class="progress" id="incoming-progress" hidden><div class="bar" id="incoming-bar"></div></div>
+      <p class="readout" id="incoming-status" hidden>&nbsp;</p>
+      <ul class="incoming-errs" id="incoming-errs" hidden></ul>
+    </section>
+
+    <form id="upload-form" class="modal-body" hidden>
+      <p class="hint">Signed in · <button type="button" id="logout" class="linkbtn">sign out</button></p>
+      <label for="file">GPX file</label>
+      <input id="file" type="file" accept=".gpx,application/gpx+xml,text/xml" required>
+      <button type="submit" class="primary" id="upload-go">Upload</button>
+      <div class="progress" id="progress" hidden><div class="bar" id="progress-bar"></div></div>
+      <p class="err" id="upload-err" hidden></p>
+      <p class="ok" id="upload-ok" hidden></p>
+      <button type="button" class="secondary" id="btn-manage" aria-expanded="false">List &amp; edit tracks</button>
+    </form>
+
+    <!-- Rename / delete. Signed-in only, opened from the button above. -->
+    <section id="manage" class="modal-body manage" hidden>
+      <div class="manage-head">
+        <h3 id="manage-title">Tracks</h3>
+        <button type="button" class="linkbtn" id="manage-close">done</button>
+      </div>
+      <ul class="manage-list" id="manage-list"></ul>
+      <p class="err" id="manage-err" hidden></p>
+    </section>
+  </div>
+</div>
+
+<!-- Track editor. Opened by Option/Alt-clicking a track, or from List & edit. -->
+<div id="editor" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <div class="panel-head">
+      <h2 id="editor-title">Edit track</h2>
+      <button class="panel-close" type="button" id="editor-close" aria-label="Close">✕</button>
+    </div>
+    <form id="editor-form" class="modal-body">
+      <div class="field" id="ed-name-field">
+        <label for="ed-name">Name</label>
+        <input id="ed-name" type="text" maxlength="200" autocomplete="off">
+      </div>
+
+      <div class="field" id="ed-date-field">
+        <label for="ed-date">Date</label>
+        <input id="ed-date" type="date" min="1990-01-01" max="2100-12-31">
+      </div>
+
+      <div class="field">
+        <label for="ed-country">Country</label>
+        <input id="ed-country" type="text" maxlength="60" autocomplete="off" list="ed-country-list" placeholder="Scotland">
+        <datalist id="ed-country-list"></datalist>
+      </div>
+
+      <div class="field">
+        <label for="ed-tags">Tags</label>
+        <input id="ed-tags" type="text" maxlength="400" autocomplete="off" placeholder="coastal, munro, overnight">
+        <p class="hint" id="ed-tag-hint">Separate tags with commas.</p>
+      </div>
+
+      <button type="submit" class="primary" id="ed-save">Save</button>
+      <div class="progress" id="ed-progress" hidden><div class="bar" id="ed-bar"></div></div>
+      <p class="err" id="ed-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<script src="assets/leaflet/leaflet.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

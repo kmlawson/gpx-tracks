@@ -1,0 +1,52 @@
+# Apache hardening for the GPX site. (Nginx users: see README.md.)
+# Needs AllowOverride All (or at least AuthConfig FileInfo Options Indexes).
+
+Options -Indexes -ExecCGI
+DirectoryIndex index.html
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header always set Strict-Transport-Security "max-age=31536000" env=HTTPS
+
+  # Same policy as the meta tag in index.html, but delivered as a header so
+  # frame-ancestors is honoured and every response is covered.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://server.arcgisonline.com https://services.arcgisonline.com https://*.basemaps.cartocdn.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
+  Header always unset X-Powered-By
+</IfModule>
+
+# There is no build step, so assets/app.js keeps the same name for ever. Without
+# this a browser applies heuristic caching and goes on running the copy it
+# already has after you upload a new one — the classic "my change has not
+# appeared". "no-cache" still stores the file, it just revalidates before use,
+# so the usual answer is a cheap 304 rather than a fresh download.
+<FilesMatch "\.(js|css|html)$">
+  <IfModule mod_headers.c>
+    Header always set Cache-Control "no-cache"
+  </IfModule>
+</FilesMatch>
+
+# GPX files are public to read, and are inert XML: no scripting, no sniffing.
+<FilesMatch "\.gpx$">
+  ForceType application/gpx+xml
+  <IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'none'; sandbox"
+  </IfModule>
+</FilesMatch>
+
+# Dotfiles, the credential store, logs, internal state and the docs are never
+# served, whatever the URL or the directory.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+<FilesMatch "^(credentials\.php|lib\.php|ratelimit\.json|uploads\.log|README\.md|report\.md)$|\.(log|user\.ini)$">
+  Require all denied
+</FilesMatch>
+
+# Case-insensitive: some filesystems (macOS, Windows) would otherwise let
+# /Tools/ or /DATA/Auth/ walk straight past a case-sensitive rule.
+RedirectMatch 404 (?i)^/(?:.*/)?(tools|data/auth|data/meta|data/sessions|data/incoming)/
+# Loose source GPX files dropped in the site root are not part of the library.
+RedirectMatch 404 (?i)^/[^/]+\.gpx$

@@ -1,0 +1,22 @@
+# Upload limits and error handling for Apache + mod_php.
+# (PHP-FPM / CGI users get the same values from .user.ini in this directory.)
+
+<IfModule mod_php.c>
+  php_value upload_max_filesize 26M
+  php_value post_max_size 27M
+  php_value max_file_uploads 2
+  php_flag  display_errors off
+  php_flag  html_errors off
+  php_value max_execution_time 120
+  php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php7.c>
+  php_value upload_max_filesize 26M
+  php_value post_max_size 27M
+  php_flag  display_errors off
+</IfModule>
+
+# Only session.php, list.php and upload.php are entry points.
+<FilesMatch "^(lib\.php|credentials\.php|\.user\.ini)$">
+  Require all denied
+</FilesMatch>

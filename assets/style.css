@@ -1,0 +1,488 @@
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --ink: #1b1f24;
+  --muted: #667085;
+  --line: #dfe3e8;
+  --accent: #c2410c;
+  --accent-ink: #ffffff;
+  --shadow: 0 8px 28px rgba(16, 24, 40, .16);
+  --topbar-h: 52px;
+  --panel-w: 320px;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171b;
+    --panel: #1c2126;
+    --ink: #e8eaed;
+    --muted: #9aa4b2;
+    --line: #2c333b;
+    --accent: #f97316;
+    --accent-ink: #17191c;
+    --shadow: 0 8px 28px rgba(0, 0, 0, .5);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+body { display: flex; flex-direction: column; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------------- top bar ---------------- */
+
+#topbar {
+  height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  z-index: 1200;
+  flex: none;
+}
+
+#title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 auto 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  border-radius: 9px;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 38px;
+}
+.topbtn:hover:not(:disabled) { border-color: var(--accent); }
+.topbtn:disabled { opacity: .4; cursor: default; }
+.topbtn[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.topbtn .ico { font-size: 15px; line-height: 1; }
+
+#btn-upload { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* ---------------- layout ---------------- */
+
+#stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+#map {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  background: var(--bg);
+  z-index: 1;
+}
+
+.panel {
+  width: var(--panel-w);
+  flex: none;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  z-index: 900;
+}
+.panel-right { border-right: 0; border-left: 1px solid var(--line); }
+.panel[hidden], [hidden] { display: none !important; }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.panel-head h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#info-name { text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink); }
+.count { color: var(--muted); font-weight: 400; }
+
+/* Sits in the panel head, so it must not push the title or the ✕ around. */
+.showall { flex: none; padding: 5px 10px; font-size: 12.5px; }
+
+.panel-close {
+  border: 0; background: transparent; color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 6px; border-radius: 8px;
+}
+.panel-close:hover { color: var(--ink); background: rgba(127,127,127,.12); }
+
+/* ---------------- track list ---------------- */
+
+.controls { padding: 10px 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); flex: none; }
+
+#search, #sort, #filter-tag, #login-pass, #file,
+#ed-name, #ed-date, #ed-country, #ed-tags {
+  width: 100%;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 16px; /* keeps iOS from zooming on focus */
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+#search:focus, #sort:focus, input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.sortrow { display: flex; gap: 8px; }
+.sortrow #sort { flex: 1; }
+#sort-dir {
+  width: 42px; flex: none; border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink); border-radius: 9px; font-size: 16px; cursor: pointer;
+}
+
+/* Set apart from the sort row: sorting reorders, this one hides things, and
+   confusing the two costs you tracks you think have vanished. */
+#filter-tag.active { border-color: var(--accent); color: var(--accent); }
+
+.track-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1 1 auto; -webkit-overflow-scrolling: touch; }
+
+.trackrow { display: flex; align-items: stretch; gap: 2px; }
+
+.dlbtn {
+  flex: none;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 17px;
+  line-height: 1;
+}
+.dlbtn:hover, .dlbtn:focus-visible { background: rgba(127,127,127,.14); color: var(--accent); }
+
+.track {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  display: block;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.track:hover { background: rgba(127,127,127,.10); }
+.track.active { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); }
+.track .tname { display: block; font-weight: 600; margin-bottom: 2px; overflow-wrap: anywhere; }
+.track .tmeta { display: block; color: var(--muted); font-size: 12.5px; }
+.track .tmeta span + span::before { content: " · "; }
+
+/* Shift-clicked rows. A left border rather than a fill, so it stays legible
+   next to .active, which already fills the selected track. */
+.track.picked {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.pick-hint {
+  margin: 0; padding: 8px 12px;
+  font-size: 12.5px; color: var(--muted);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+.empty { color: var(--muted); padding: 14px; margin: 0; }
+
+/* ---------------- tag buttons ---------------- */
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.tagbtn {
+  font: inherit; font-size: 12.5px; line-height: 1;
+  padding: 6px 10px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tagbtn:hover { border-color: var(--accent); color: var(--accent); }
+.tagbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+/* The country reads as the heading of the set, so it is the solid one. */
+.tagbtn.country { color: var(--ink); border-color: var(--muted); }
+.tagbtn.country.on { color: var(--accent-ink); border-color: var(--accent); }
+
+.field { display: grid; gap: 6px; }
+.field[hidden] { display: none; }
+
+/* ---------------- trip info ---------------- */
+
+#info-body { overflow-y: auto; padding: 12px; flex: 1 1 auto; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+.stats > div {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.stats dt { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.stats dd { margin: 2px 0 0; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stats dd small { font-size: 12px; font-weight: 400; color: var(--muted); }
+
+.profile-wrap h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
+.profile { width: 100%; height: 150px; touch-action: none; }
+.profile svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.profile .area { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
+.profile .line { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+.profile .grid { stroke: var(--line); stroke-width: 1; }
+.profile .axis { fill: var(--muted); font-size: 10px; }
+.profile .cursor { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; opacity: .7; }
+.profile .dot { fill: var(--accent); stroke: var(--panel); stroke-width: 2; }
+.readout { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+
+.dl { margin: 16px 0 4px; display: flex; align-items: center; gap: 12px; }
+.dl a { color: var(--accent); }
+.dl .dlmain {
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+.dl .dlmain:hover { background: var(--accent); color: var(--accent-ink); }
+.dl #view-link { font-size: 13px; color: var(--muted); }
+
+/* ---------------- upload modal ---------------- */
+
+.modal {
+  position: fixed; inset: 0; z-index: 3000;
+  background: rgba(10, 12, 16, .55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal-card {
+  width: min(420px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.modal-body { padding: 14px; display: grid; gap: 8px; }
+.modal-body label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.hint { color: var(--muted); font-size: 13px; margin: 0 0 4px; }
+.primary {
+  margin-top: 6px; padding: 11px 14px; font: inherit; font-weight: 600;
+  background: var(--accent); color: var(--accent-ink);
+  border: 0; border-radius: 9px; cursor: pointer;
+}
+.primary:disabled { opacity: .6; cursor: default; }
+.linkbtn { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
+.err { color: #dc2626; font-size: 13px; margin: 4px 0 0; }
+.ok  { color: #15803d; font-size: 13px; margin: 4px 0 0; }
+@media (prefers-color-scheme: dark) { .err { color: #f87171; } .ok { color: #4ade80; } }
+
+.secondary {
+  margin-top: 10px; padding: 9px 12px; font: inherit;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+}
+.secondary:hover { border-color: var(--accent); }
+
+/* ---------------- manage (rename / delete) ---------------- */
+
+.manage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.manage-head h3 { margin: 0; font-size: 15px; }
+
+.manage-list { list-style: none; margin: 0; padding: 0; max-height: 44vh; overflow-y: auto; }
+.manage-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-top: 1px solid var(--line);
+}
+.manage-row:first-child { border-top: 0; }
+.manage-name { flex: 1 1 auto; min-width: 0; }
+.manage-name .n { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.manage-name .d { display: block; color: var(--muted); font-size: 12px; }
+.manage-row input[type="text"] { flex: 1 1 auto; min-width: 0; }
+
+/* Fixed width so the row does not reflow as labels change during a confirm. */
+.rowbtn {
+  flex: none; padding: 6px 10px; font: inherit; font-size: 13px;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+}
+.rowbtn:hover:not(:disabled) { border-color: var(--accent); }
+.rowbtn:disabled { opacity: .5; cursor: default; }
+.rowbtn.danger { color: #dc2626; }
+.rowbtn.danger.armed { background: #dc2626; color: #fff; border-color: #dc2626; }
+@media (prefers-color-scheme: dark) { .rowbtn.danger { color: #f87171; } }
+
+.progress { height: 6px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.progress .bar { height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+
+/* Drop-folder panel in the upload dialog. Separated from the upload form above
+   it, because they are two different ways of doing the same thing. */
+.incoming {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.incoming-errs {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  font-size: 12.5px; color: var(--muted);
+  max-height: 128px; overflow-y: auto;
+}
+.incoming-errs li { padding: 3px 0; border-top: 1px solid var(--line); }
+.incoming-errs strong { color: var(--ink); font-weight: 600; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: var(--ink); color: var(--bg);
+  padding: 9px 14px; border-radius: 999px; font-size: 13.5px;
+  z-index: 4000; box-shadow: var(--shadow); max-width: 90vw; text-align: center;
+}
+
+/* ---------------- loading indicator ---------------- */
+
+/* Sits over the map, but never blocks it: panning and zooming stay live while
+   a track downloads, so a slow track cannot make the site feel frozen. */
+.loading {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 10px 16px; border-radius: 999px;
+  font-size: 13.5px; white-space: nowrap; max-width: 80vw;
+  box-shadow: var(--shadow);
+  z-index: 1200;            /* over the map and its controls, under the panels */
+  pointer-events: none;
+}
+.loading > span:last-child {
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.spinner {
+  flex: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* A spinning element is exactly the kind of motion this setting is for. Keep
+   the indicator, drop the rotation. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; border-top-color: var(--accent); opacity: 0.7; }
+}
+
+/* ---------------- leaflet tweaks ---------------- */
+
+.leaflet-container { font: inherit; background: var(--bg); }
+.leaflet-control-attribution { font-size: 10px; }
+.leaflet-bar a, .leaflet-control-layers-toggle { width: 34px; height: 34px; line-height: 34px; }
+.hover-dot { pointer-events: none; }
+
+/* ---------------- mobile ---------------- */
+
+@media (max-width: 800px) {
+  :root { --panel-w: 100%; }
+
+  #stage { display: block; }
+  #map { position: absolute; inset: 0; height: 100%; width: 100%; }
+
+  .panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    top: auto;
+    max-height: 72%;
+    width: auto;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0;
+    box-shadow: var(--shadow);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateY(102%);
+    transition: transform .22s ease;
+    z-index: 1100;
+  }
+  .panel.open { transform: translateY(0); }
+  .panel:not(.open) { pointer-events: none; }
+
+  /* The grab handle belongs to the bottom sheets. Dialogs share .panel-head but
+     are not draggable, and a handle on one is a promise the UI does not keep. */
+  .panel .panel-head::before {
+    content: "";
+    position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    width: 38px; height: 4px; border-radius: 2px; background: var(--line);
+  }
+  .panel .panel-head { position: relative; padding-top: 16px; }
+
+  .topbtn .lbl { display: none; }
+  #btn-upload .lbl { display: inline; }
+  #title { font-size: 15px; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .profile { height: 130px; }
+
+  /* Finger-sized hit areas. These are all fine with a mouse but are 19-27px
+     tall by default, which is a miss waiting to happen on a phone. */
+  .panel-close {
+    min-width: 44px; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 20px; padding: 0;
+  }
+  .tagbtn { padding: 10px 14px; font-size: 13.5px; }
+  .rowbtn { padding: 9px 12px; }
+  .showall { padding: 9px 12px; font-size: 13px; }
+  /* Inline by default, so padding alone would not grow the box. */
+  .linkbtn, .dl a { display: inline-block; padding: 9px 4px; }
+  .dl { gap: 8px; }
+}
+
+@media (max-width: 420px) {
+  #btn-upload .lbl { display: none; }
+  #title { max-width: 45vw; }
+}
+
+/* desktop: panels are always laid out, hidden by class */
+@media (min-width: 801px) {
+  .panel.collapsed { display: none; }
+}
