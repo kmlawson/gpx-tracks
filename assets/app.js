@@ -1086,10 +1086,40 @@
    * Selection
    * ------------------------------------------------------------------ */
 
+  /**
+   * The only query parameter this site uses.
+   *
+   * Everything else is dropped rather than blocked by name: Facebook adds
+   * fbclid, Google gclid, ad campaigns utm_*, Instagram igshid, and there will
+   * be another one next year. Keeping what is ours and discarding the rest
+   * needs no list to maintain, and means a link copied out of the address bar
+   * never carries someone else's tracking id onwards.
+   */
+  var OWN_PARAMS = ['track'];
+  var TRACK_ID = /^[a-z0-9-]{1,120}$/;
+
   function setUrl(id) {
     var url = new URL(window.location.href);
-    if (id) url.searchParams.set('track', id); else url.searchParams.delete('track');
+    var keep = new URLSearchParams();
+    OWN_PARAMS.forEach(function (k) {
+      var v = url.searchParams.get(k);
+      if (v !== null) keep.set(k, v);
+    });
+    if (id) keep.set('track', id); else keep.delete('track');
+    // Never echo a malformed id back into the address bar.
+    var t = keep.get('track');
+    if (t !== null && !TRACK_ID.test(t)) keep.delete('track');
+    url.search = keep.toString();
     history.replaceState(null, '', url.toString());
+  }
+
+  /**
+   * Strip the URL immediately, before anything is fetched, so it is clean even
+   * if the catalogue never loads — and so nothing else has a chance to read a
+   * parameter that should not be there.
+   */
+  function cleanUrl() {
+    setUrl(new URLSearchParams(window.location.search).get('track'));
   }
 
   var loadToken = 0;
@@ -1965,6 +1995,7 @@
    * Boot
    * ------------------------------------------------------------------ */
 
+  cleanUrl();
   layoutDefaults();
   showUploadBtn(false);   // hidden on a desktop, present on a phone
   // Before the catalogue, so the list is interactive with the right permissions

@@ -167,6 +167,14 @@ looking at is always shareable, and opening such a URL loads that track directly
 If the track has since been removed, the site says so and falls back to the full
 collection.
 
+`track` is the **only** query parameter the site keeps. Anything else is stripped
+from the address bar as the page loads — Facebook's `fbclid`, Google's `gclid`,
+`utm_*`, `igshid` and whatever the next one turns out to be. It is a list of what
+to keep rather than a list of what to block, so it needs no maintaining, and a
+link copied out of the address bar never passes someone else's tracking id on.
+A malformed `track` value is dropped rather than echoed back, and the fragment
+(`#…`) is left alone.
+
 ### Uploading
 
 The **Upload** button is hidden until you hold **Option/Alt**, so the bar stays
