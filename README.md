@@ -169,7 +169,11 @@ collection.
 
 ### Uploading
 
-The **Upload** button opens a dialog: sign in once with the collection password,
+The **Upload** button is hidden until you hold **Option/Alt**, so the bar stays
+quiet for anyone just looking at the map. On a phone there is no Option key, so
+it is always there, styled like the other buttons rather than in accent orange.
+
+It opens a dialog: sign in once with the collection password,
 then choose a `.gpx` file. There is a progress bar for large files, and the new
 track is selected on the map as soon as it lands — and the list scrolls to it,
 which matters once the collection is long enough that a new track can sort well

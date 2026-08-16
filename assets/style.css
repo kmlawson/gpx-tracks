@@ -526,6 +526,14 @@ body { display: flex; flex-direction: column; }
 
   .topbtn .lbl { display: none; }
   #btn-upload .lbl { display: inline; }
+  /* There is no Option key to reveal it here, so it stays on screen — but in
+     the same plain style as the other buttons rather than solid accent, so it
+     does not dominate a bar that is mostly for reading. */
+  #btn-upload {
+    background: var(--panel);
+    color: var(--ink);
+    border-color: var(--line);
+  }
   .home { font-size: 15px; }
   /* Less room between the buttons on a phone, so give it less to work with. */
   .track-title { font-size: 13.5px; max-width: 38vw; }

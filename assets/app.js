@@ -390,7 +390,11 @@
   }
   var lastMobile = MOBILE();
   window.addEventListener('resize', function () {
-    if (MOBILE() !== lastMobile) { lastMobile = MOBILE(); layoutDefaults(); }
+    if (MOBILE() !== lastMobile) {
+      lastMobile = MOBILE();
+      layoutDefaults();
+      showUploadBtn(altHeld);   // the rule differs either side of the breakpoint
+    }
     map.invalidateSize();
     if (current) drawProfile();
   });
@@ -1137,6 +1141,7 @@
 
   function showModal(show) {
     modal.hidden = !show;
+    if (!show) showUploadBtn(altHeld);
     if (show) {
       refreshSession().then(function () {
         var target = $('login-form').hidden ? $('file') : $('login-pass');
@@ -1144,6 +1149,36 @@
       });
     }
   }
+  /* ------------------------------------------------------------------ *
+   * The Upload button, revealed by holding Option/Alt
+   * ------------------------------------------------------------------ */
+
+  var altHeld = false;
+
+  function showUploadBtn(on) {
+    // A phone has no Option key, so hiding it there would hide the only way
+    // in to signing in, uploading and editing. It stays, toned down in CSS to
+    // the same weight as the other buttons.
+    if (MOBILE()) { $('btn-upload').hidden = false; return; }
+    // Never take it away while the dialog it opened is still on screen.
+    if (!on && !$('modal').hidden) return;
+    $('btn-upload').hidden = !on;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.key === 'Alt') { altHeld = true; showUploadBtn(true); }
+  });
+  document.addEventListener('keyup', function (e) {
+    if (!e.altKey || e.key === 'Alt') { altHeld = false; showUploadBtn(false); }
+  });
+  // Alt-Tabbing away releases the key somewhere else, so the keyup never
+  // arrives and the button would stay visible for good.
+  function forgetAlt() { altHeld = false; showUploadBtn(false); }
+  window.addEventListener('blur', forgetAlt);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) forgetAlt();
+  });
+
   $('btn-upload').addEventListener('click', function () { showModal(true); });
   $('modal-close').addEventListener('click', function () { showModal(false); });
   modal.addEventListener('click', function (e) { if (e.target === modal) showModal(false); });
@@ -1931,6 +1966,7 @@
    * ------------------------------------------------------------------ */
 
   layoutDefaults();
+  showUploadBtn(false);   // hidden on a desktop, present on a phone
   // Before the catalogue, so the list is interactive with the right permissions
   // from its first render rather than only after the Upload dialog is opened.
   if (hasSessionHint()) refreshSession();
