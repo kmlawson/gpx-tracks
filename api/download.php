@@ -4,8 +4,8 @@
  * readable filename. Read access is deliberately open — the same bytes are
  * already reachable at data/gpx/<id>.gpx.
  *
- *   GET api/download.php?id=<id>          -> attachment
- *   GET api/download.php?id=<id>&view=1   -> inline (still non-executable XML)
+ *   GET api/download.php?id=<id>          -> attachment, application/gpx+xml
+ *   GET api/download.php?id=<id>&view=1   -> inline, text/plain (see below)
  */
 
 declare(strict_types=1);
@@ -60,7 +60,21 @@ $inline = isset($_GET['view']) && $_GET['view'] === '1';
 $size = filesize($real);
 
 header_remove('X-Powered-By');
-header('Content-Type: application/gpx+xml; charset=utf-8');
+/**
+ * Same bytes, two types.
+ *
+ * attachment gets the real one, application/gpx+xml, so the saved file is a GPX
+ * that other software recognises.
+ *
+ * inline gets text/plain, because "view raw" has to be something a browser can
+ * actually show. Content-Disposition: inline only means "display this if you
+ * can" — no browser has a viewer for application/gpx+xml, and nosniff below
+ * (which must stay) forbids it guessing that the bytes are really XML, so an
+ * inline GPX type just produces a download prompt and the link does nothing the
+ * download button does not. text/plain is inert: nothing executes, and nosniff
+ * pins it as text so it cannot be re-interpreted as markup.
+ */
+header('Content-Type: ' . ($inline ? 'text/plain' : 'application/gpx+xml') . '; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Content-Security-Policy: default-src \'none\'; sandbox');
 header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment')
