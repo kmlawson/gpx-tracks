@@ -85,37 +85,10 @@ function logline(string $level, string $msg): void
 
 function out(string $s): void { fwrite(STDOUT, $s . "\n"); }
 
-/**
- * A yyyy.mm.dd date standing alone in a name — the same rule assets/app.js uses,
- * so the script and the site never disagree about what a title date is.
- *
- * @return array{y:int,m:int,d:int}|null
+/*
+ * The yyyy.mm.dd rule lives in api/lib.php as meta_title_date(), so this script
+ * and the site can never disagree about what counts as a date in a name.
  */
-function title_date(string $name): ?array
-{
-    if (!preg_match_all('/(\d{4})\.(\d{1,2})\.(\d{1,2})/', $name, $all, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
-        return null;
-    }
-    foreach ($all as $m) {
-        $offset = $m[0][1];
-        $text   = $m[0][0];
-        $before = $offset === 0 ? '' : substr($name, $offset - 1, 1);
-        $after  = substr($name, $offset + strlen($text), 1);
-        // Must stand alone: 1.2024.2.18 or 2024.2.18.4 is a version, not a date.
-        if ($before !== '' && (ctype_digit($before) || $before === '.')) {
-            continue;
-        }
-        if ($after !== '' && (ctype_digit($after) || $after === '.')) {
-            continue;
-        }
-        $y = (int)$m[1][0]; $mo = (int)$m[2][0]; $d = (int)$m[3][0];
-        if (!checkdate($mo, $d, $y) || $y < 1990 || $y > 2100) {
-            continue;   // rejects 2024.2.31 rather than rolling it into March
-        }
-        return ['y' => $y, 'm' => $mo, 'd' => $d];
-    }
-    return null;
-}
 
 ensure_dirs();
 
@@ -199,7 +172,7 @@ foreach ($files as $path) {
     $name = (string)($meta['name'] ?? '');
     $backup[$id] = ['date' => $meta['date'] ?? null, 'date_manual' => !empty($meta['date_manual'])];
 
-    $t = title_date($name);
+    $t = meta_title_date($name);
     if ($t !== null) {
         $iso = sprintf('%04d-%02d-%02dT12:00:00+00:00', $t['y'], $t['m'], $t['d']);
         $meta['date'] = $iso;

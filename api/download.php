@@ -39,13 +39,14 @@ if ($real === false || $base === false
     fail('Track not found', 404);
 }
 
-// A readable filename, taken from the stored metadata rather than the request.
+// A readable filename, taken from the stored metadata rather than the request:
+// "2024.02.18 - Abbey St Bathans - 10.9km.gpx".
 $name = $id;
 $metaFile = meta_path($id);
 if (is_file($metaFile)) {
     $meta = json_decode((string)file_get_contents($metaFile), true);
     if (is_array($meta) && !empty($meta['name']) && is_string($meta['name'])) {
-        $name = $meta['name'];
+        $name = download_basename($meta);
     }
 }
 $ascii = preg_replace('/[^A-Za-z0-9 ._-]+/', '_', $name) ?? $id;

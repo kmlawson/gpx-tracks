@@ -648,6 +648,108 @@ const PUBLIC_META_FIELDS = [
     'ele_min', 'ele_max', 'ele_spread', 'ele_gain', 'ele_loss', 'bounds',
 ];
 
+/* ------------------------------------------------------------------ *
+ * Dates carried in a track's name
+ *
+ * The same rule as assets/app.js, so a filename never disagrees with what the
+ * page shows. Kept here rather than in each caller because three of them need
+ * it: the download endpoint, the catalogue and the one-off date repair.
+ * ------------------------------------------------------------------ */
+
+/** @return array{y:int,m:int,d:int,text:string,pos:int}|null */
+function meta_title_date(string $name): ?array
+{
+    if (!preg_match_all('/(\d{4})\.(\d{1,2})\.(\d{1,2})/', $name, $all, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
+        return null;
+    }
+    foreach ($all as $m) {
+        $pos    = $m[0][1];
+        $text   = $m[0][0];
+        $before = $pos === 0 ? '' : substr($name, $pos - 1, 1);
+        $after  = substr($name, $pos + strlen($text), 1);
+        // Must stand alone: 1.2024.2.18 or 2024.2.18.4 is a version, not a date.
+        if ($before !== '' && (ctype_digit($before) || $before === '.')) {
+            continue;
+        }
+        if ($after !== '' && (ctype_digit($after) || $after === '.')) {
+            continue;
+        }
+        $y = (int)$m[1][0]; $mo = (int)$m[2][0]; $d = (int)$m[3][0];
+        if (!checkdate($mo, $d, $y) || $y < 1990 || $y > 2100) {
+            continue;   // rejects 2024.2.31 rather than rolling it into March
+        }
+        return ['y' => $y, 'm' => $mo, 'd' => $d, 'text' => $text, 'pos' => $pos];
+    }
+    return null;
+}
+
+/** The name as shown: any yyyy.mm.dd removed, leftover punctuation tidied. */
+function meta_display_name(array $meta): string
+{
+    $name = (string)($meta['name'] ?? ($meta['id'] ?? ''));
+    $t = meta_title_date($name);
+    if ($t === null) {
+        return $name;
+    }
+    $out = substr($name, 0, $t['pos']) . substr($name, $t['pos'] + strlen($t['text']));
+    $out = preg_replace('/\s+/u', ' ', $out) ?? $out;
+    $out = trim($out, " \t\n\r\0\x0B-–—_.,:");
+    return $out !== '' ? $out : $name;
+}
+
+/**
+ * The date to show for a track, as YYYY-MM-DD, or null when it has none.
+ * A date set by hand wins; then one carried in the name; then the file's own.
+ */
+function meta_effective_date(array $meta): ?string
+{
+    $raw = (string)($meta['date'] ?? '');
+    if (!empty($meta['date_manual'])) {
+        return $raw !== '' ? substr($raw, 0, 10) : null;
+    }
+    $t = meta_title_date((string)($meta['name'] ?? ''));
+    if ($t !== null) {
+        return sprintf('%04d-%02d-%02d', $t['y'], $t['m'], $t['d']);
+    }
+    return $raw !== '' ? substr($raw, 0, 10) : null;
+}
+
+/**
+ * Download filename, without the extension:
+ *
+ *     2024.02.18 - Abbey St Bathans - 10.9km
+ *
+ * Any part the track does not have is dropped along with its separator, so a
+ * track with no date and no distance is just its name.
+ */
+function download_basename(array $meta): string
+{
+    $parts = [];
+
+    $date = meta_effective_date($meta);
+    if ($date !== null && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m)) {
+        $parts[] = $m[1] . '.' . $m[2] . '.' . $m[3];
+    }
+
+    $name = meta_display_name($meta);
+    if ($name !== '') {
+        $parts[] = $name;
+    }
+
+    $metres = $meta['distance_m'] ?? null;
+    if (is_numeric($metres) && $metres > 0) {
+        $km = $metres / 1000;
+        // Matches how the site prints distances, minus the space, which reads
+        // badly in a filename next to the surrounding " - " separators.
+        $parts[] = ($km < 10 ? number_format($km, 2, '.', '') : number_format($km, 1, '.', '')) . 'km';
+    }
+
+    if ($parts === []) {
+        return (string)($meta['id'] ?? 'track');
+    }
+    return implode(' - ', $parts);
+}
+
 function public_meta(array $meta): array
 {
     return array_intersect_key($meta, array_flip(PUBLIC_META_FIELDS));

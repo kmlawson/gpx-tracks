@@ -87,6 +87,13 @@ Selecting a track opens the info panel:
   matching position.
 - **Download GPX**, and a *view raw* link that opens the file in the browser.
 
+Downloads are named `2024.02.18 - Abbey St Bathans - 10.9km.gpx` — date, name,
+distance. Any part a track does not have is dropped along with its separator, so
+an undated track is just `Name - 10.9km.gpx`. A date carried in the track's own
+name is used for the prefix and not repeated in the middle. The server sets this
+through `Content-Disposition`, which is what browsers honour; the page computes
+the identical name for the static fallback when there is no PHP.
+
 ### Managing tracks
 
 Signed in, **Option-click** (Alt-click) any track in the list to open its editor:

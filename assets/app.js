@@ -128,8 +128,32 @@
       ? 'api/download.php?id=' + encodeURIComponent(id)
       : 'data/gpx/' + encodeURIComponent(id) + '.gpx';
   }
+  /**
+   * "2024.02.18 - Abbey St Bathans - 10.9km.gpx". Any part the track does not
+   * have is dropped with its separator.
+   *
+   * Only used for the static fallback: when the API is available the server's
+   * Content-Disposition sets the name, and takes precedence over a download
+   * attribute. api/lib.php builds the identical string.
+   */
   function downloadName(meta) {
-    return ((meta.name || meta.id).replace(/[^\w .-]+/g, '_').slice(0, 80) || meta.id) + '.gpx';
+    var parts = [];
+    var d = displayDate(meta);
+    if (d.iso) {
+      var dt = new Date(d.iso);
+      if (!isNaN(dt)) {
+        var p2 = function (n) { return String(n).padStart(2, '0'); };
+        parts.push(dt.getFullYear() + '.' + p2(dt.getMonth() + 1) + '.' + p2(dt.getDate()));
+      }
+    }
+    var name = displayName(meta);
+    if (name) parts.push(name);
+    var m = meta.distance_m;
+    if (typeof m === 'number' && m > 0) {
+      parts.push((m / 1000).toFixed(m < 10000 ? 2 : 1) + 'km');
+    }
+    var base = parts.join(' - ') || meta.id;
+    return (base.replace(/[^\w .-]+/g, '_').slice(0, 120) || meta.id) + '.gpx';
   }
 
   /* ------------------------------------------------------------------ *
