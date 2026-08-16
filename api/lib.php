@@ -77,6 +77,15 @@ const LOGIN_MAX_FAILS    = 8;                  // failures per IP prefix per win
 const LOGIN_MAX_FAILS_ALL = 24;                // failures site-wide per window
 const LOGIN_WINDOW       = 900;                // 15 minutes
 const UPLOAD_MAX_PER_HOUR = 60;
+/**
+ * Signed-in bulk maintenance — adopting a drop folder, rebuilding stored files.
+ * Deliberately far above the upload limit: those 60/hour exist to stop someone
+ * hammering the upload endpoint, but this work is one deliberate click on a
+ * library you already own, and a collection of a few hundred tracks would trip
+ * an abuse limit while doing exactly what it was asked to. Still bounded, so a
+ * runaway client cannot loop for ever.
+ */
+const MAINTENANCE_MAX_PER_HOUR = 5000;
 const SESSION_IDLE       = 7200;               // 2 hours
 const SESSION_ABSOLUTE   = 86400;              // 24 hours
 const UPLOAD_LOG_MAX     = 1048576;            // rotate the private log at 1 MB

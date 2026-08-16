@@ -47,9 +47,10 @@ if ((string)($_POST['action'] ?? '') !== 'recompact') {
     fail('Unknown action', 400);
 }
 
-// Rewriting a track costs about what ingesting one costs, so it draws on the
-// same budget rather than getting an uncounted one of its own.
-if (!rate_limit('upload|' . client_ip_prefix(), UPLOAD_MAX_PER_HOUR, 3600)) {
+// Its own budget, not the upload one: rebuilding a library of several hundred
+// tracks is a single deliberate action, and counting it against an anti-abuse
+// limit meant to slow down a stranger stopped the job half way through.
+if (!rate_limit('maint|' . client_ip_prefix(), MAINTENANCE_MAX_PER_HOUR, 3600)) {
     fail('Rate limit reached. Try again later.', 429);
 }
 

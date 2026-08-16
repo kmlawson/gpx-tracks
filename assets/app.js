@@ -9,7 +9,7 @@
    * "it is broken" reports whose cause was invisible, so each carries the same
    * stamp and the page says plainly when they disagree.
    */
-  var APP_VERSION = '2026.08.16.4';
+  var APP_VERSION = '2026.08.16.6';
 
   var API_LIST = 'api/list.php';
   var FALLBACK_LIST = 'data/index.json';

@@ -41,9 +41,11 @@ if ((string)($_POST['action'] ?? '') !== 'adopt') {
     fail('Unknown action', 400);
 }
 
-// Shares the upload budget: adopting a file costs the same work as receiving
-// one, and there is no reason for the two to be counted separately.
-if (!rate_limit('upload|' . client_ip_prefix(), UPLOAD_MAX_PER_HOUR, 3600)) {
+// The maintenance budget, not the upload one. Dropping eighty files into the
+// folder and pressing the button is one intended action; the upload limit is
+// for a stranger pushing files at the endpoint, and applying it here simply
+// stopped a large batch part way through.
+if (!rate_limit('maint|' . client_ip_prefix(), MAINTENANCE_MAX_PER_HOUR, 3600)) {
     fail('Rate limit reached. Try again later.', 429);
 }
 

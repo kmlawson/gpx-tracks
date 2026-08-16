@@ -1,5 +1,5 @@
 :root {
-  --app-version: "2026.08.16.4";
+  --app-version: "2026.08.16.6";
   --bg: #f6f7f9;
   --panel: #ffffff;
   --ink: #1b1f24;
@@ -175,26 +175,29 @@ body { display: flex; flex-direction: column; }
 
 /* ---------------- track list ---------------- */
 
-.controls { padding: 10px 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); flex: none; }
+.controls { padding: 8px 10px; display: grid; gap: 6px; border-bottom: 1px solid var(--line); flex: none; }
 
+/* Compact by default. The 16px that stops iOS zooming on focus is a phone
+   problem, and paying for it on a desktop made the three controls above the
+   list taller than the rows they filter. */
 #search, #sort, #filter-tag, #login-pass, #file,
 #ed-name, #ed-date, #ed-country, #ed-tags {
   width: 100%;
-  padding: 9px 10px;
+  padding: 6px 9px;
   font: inherit;
-  font-size: 16px; /* keeps iOS from zooming on focus */
+  font-size: 13.5px;
   color: var(--ink);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 8px;
 }
 #search:focus, #sort:focus, input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.sortrow { display: flex; gap: 8px; }
+.sortrow { display: flex; gap: 6px; }
 .sortrow #sort { flex: 1; }
 #sort-dir {
-  width: 42px; flex: none; border: 1px solid var(--line); background: var(--bg);
-  color: var(--ink); border-radius: 9px; font-size: 16px; cursor: pointer;
+  width: 34px; flex: none; border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink); border-radius: 8px; font-size: 14px; cursor: pointer;
 }
 
 /* Set apart from the sort row: sorting reorders, this one hides things, and
@@ -258,8 +261,13 @@ body { display: flex; flex-direction: column; }
 /* ---------------- drop zone ---------------- */
 
 /* The whole panel is the target, so a drop can land on the empty space below a
-   short list as readily as on the rows themselves. */
-#panel-tracks { position: relative; }
+   short list as readily as on the rows themselves.
+
+   A class, not #panel-tracks: an id would out-specify the mobile rule below
+   that makes the sheet position:absolute, however much later that rule comes,
+   because a media query adds no specificity. The panel then stayed in the flow
+   and sat across the bottom of every phone screen. */
+.panel { position: relative; }
 #panel-tracks.dragging { outline: 2px dashed var(--accent); outline-offset: -6px; }
 
 .drop-hint {
@@ -549,6 +557,15 @@ body { display: flex; flex-direction: column; }
   .track-title { font-size: 13.5px; max-width: 38vw; }
   .stats { grid-template-columns: 1fr 1fr; }
   .profile { height: 130px; }
+
+  /* Roomy again here: 16px is what stops iOS zooming the page when a field
+     takes focus, and a finger needs the extra height regardless. */
+  .controls { padding: 10px 12px; gap: 8px; }
+  #search, #sort, #filter-tag, #login-pass, #file,
+  #ed-name, #ed-date, #ed-country, #ed-tags {
+    padding: 9px 10px; font-size: 16px; border-radius: 9px;
+  }
+  #sort-dir { width: 42px; font-size: 16px; border-radius: 9px; }
 
   /* Finger-sized hit areas. These are all fine with a mouse but are 19-27px
      tall by default, which is a miss waiting to happen on a phone. */

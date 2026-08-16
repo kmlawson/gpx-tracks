@@ -599,6 +599,27 @@ Track ids are a random hex prefix plus a slug of the name, e.g.
 
 Static equivalents, always available: `data/gpx/<id>.gpx` and `data/index.json`.
 
+## Keeping the browser honest
+
+`index.html`, `assets/app.js` and `assets/style.css` only work as a set, and
+they carry a shared version stamp. The page checks all three on load and says
+plainly which one is out of date, rather than letting a half-finished upload
+surface later as a missing button or an unstyled link.
+
+The stamp is on the asset URLs too (`app.js?v=…`). The filenames never change,
+and mobile Safari will keep serving an old copy however the headers ask it not
+to — a new version is a new URL, which it has no choice but to fetch.
+
+Bump all five places at once:
+
+```
+php scripts/bump-version.php            # 2026.08.16.6 -> 2026.08.16.7
+php scripts/bump-version.php --check    # report, change nothing
+php scripts/bump-version.php --set 2026.09.01.1
+```
+
+Run it whenever you change any of the three, then upload all three together.
+
 ## Command line
 
 ```
