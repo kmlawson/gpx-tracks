@@ -1,7 +1,17 @@
 # Apache hardening for the GPX site. (Nginx users: see README.md.)
 # Needs AllowOverride All (or at least AuthConfig FileInfo Options Indexes).
 
-Options -Indexes -ExecCGI
+# -Indexes only. Do NOT put -ExecCGI here. Where PHP runs through CGI rather
+# than as a module — mod_fcgid, suPHP, suexec, most shared hosting — Apache
+# consults ExecCGI to dispatch a .php request, so switching it off returns 403
+# for every api/*.php. The failure is quiet: the site still browses fine off
+# data/index.json and the static .gpx files, while sign-in, upload, editing,
+# rebuild and download.php are all dead. The giveaway is that a .php that does
+# not exist answers 403 instead of 404, because the refusal happens before
+# Apache ever looks the file up.
+# data/ has its own -ExecCGI, and that is where it belongs: nothing under there
+# should ever execute.
+Options -Indexes
 DirectoryIndex index.html
 
 <IfModule mod_headers.c>
