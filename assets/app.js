@@ -9,7 +9,7 @@
    * "it is broken" reports whose cause was invisible, so each carries the same
    * stamp and the page says plainly when they disagree.
    */
-  var APP_VERSION = '2026.08.16.6';
+  var APP_VERSION = '2026.08.16.8';
 
   var API_LIST = 'api/list.php';
   var FALLBACK_LIST = 'data/index.json';
@@ -170,6 +170,41 @@
   var initial = (saved && layers[saved]) ? saved : 'Terrain (OpenTopoMap)';
   layers[initial].addTo(map);
   L.control.layers(layers, {}, { position: 'topright' }).addTo(map);
+
+  /**
+   * A download shortcut under the layer switcher, on phones only.
+   *
+   * On a desktop the track list and the whole trip panel are on screen at once,
+   * so the download is already a click away. On a phone, with a track selected,
+   * everything but the map is hidden and reaching it means opening the trip
+   * sheet and scrolling past the profile.
+   */
+  var mapDownload = L.control({ position: 'topright' });
+  mapDownload.onAdd = function () {
+    var wrap = L.DomUtil.create('div', 'leaflet-bar map-dl');
+    var a = L.DomUtil.create('a', '', wrap);
+    a.href = '#';
+    a.setAttribute('download', '');
+    a.title = 'Download this track';
+    a.setAttribute('aria-label', 'Download this track');
+    a.textContent = '⤓';
+    // Without this the click pans the map instead of following the link.
+    L.DomEvent.disableClickPropagation(wrap);
+    this._link = a;
+    return wrap;
+  };
+  var mapDownloadOn = false;
+
+  /** Shown only on a phone, and only with a track to download. */
+  function syncMapDownload() {
+    var want = MOBILE() && !!current;
+    if (want && !mapDownloadOn) { mapDownload.addTo(map); mapDownloadOn = true; }
+    else if (!want && mapDownloadOn) { map.removeControl(mapDownload); mapDownloadOn = false; }
+    if (want && mapDownload._link && current) {
+      mapDownload._link.href = fileUrl(current.id);
+      mapDownload._link.setAttribute('download', downloadName(current));
+    }
+  }
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
   map.on('baselayerchange', function (e) {
@@ -856,6 +891,12 @@
     clearTrack();
     current = null;
     setUrl(null);
+    // "Everything" means everything: a country or tag still filtering, or a
+    // search still typed, would leave most of the collection hidden behind a
+    // button that says it is showing all of it.
+    $('search').value = '';
+    $('filter-tag').value = '';
+    rebuildTagFilter();
     $('btn-info').disabled = true;
     clearInfoPanel();
     if (MOBILE()) panelOpen('panel-info', false);
@@ -871,8 +912,7 @@
     $('stats').textContent = '';
     $('profile').textContent = '';
     $('profile-wrap').hidden = true;
-    $('tag-row').hidden = true;
-    $('dl-row').hidden = true;
+    $('tag-row').hidden = true;        // the download rides along with it
     $('info-empty').hidden = false;
   }
 
@@ -940,7 +980,6 @@
     // The panel describes a track, so none of it belongs on screen without one.
     $('info-empty').hidden = true;
     $('profile-wrap').hidden = false;
-    $('dl-row').hidden = false;
 
     var dl = $('dl-link');
     dl.href = fileUrl(meta.id);
@@ -986,11 +1025,13 @@
    */
   function renderTagRow(meta) {
     var row = $('tag-row');
+    // Held before the clear, which detaches it: the download lives inside this
+    // row so it flows after the last tag instead of taking a line of its own.
+    var dl = $('dl-row');
     row.textContent = '';
+    row.hidden = false;
     var tags = tagsOf(meta);
     var country = countryOf(meta);
-    if (!tags.length && !country) { row.hidden = true; return; }
-    row.hidden = false;
 
     var active = $('filter-tag').value.toLowerCase();
     var add = function (label, isCountry) {
@@ -1012,6 +1053,7 @@
     };
     if (country) add(country, true);
     tags.forEach(function (t) { add(t, false); });
+    row.appendChild(dl);          // always last, however many tags there are
   }
 
   /**
@@ -1037,6 +1079,13 @@
     if (label) sel.hidden = false;
     renderList();
     if (current) renderTagRow(current);
+
+    // On a phone the list is off screen, so filtering it silently looks like
+    // nothing happened. Swap the trip sheet for the list it just narrowed.
+    if (MOBILE() && label) {
+      panelOpen('panel-info', false);
+      panelOpen('panel-tracks', true);
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -1900,6 +1949,7 @@
     var focused = MOBILE() && !!current;
     document.body.classList.toggle('track-focus', focused);
     $('btn-showall-top').hidden = !focused;
+    syncMapDownload();
     if (focused) panelOpen('panel-tracks', false);
     // Settle it in both directions: on the way out of focus the button has to
     // come back, and only re-running the rule knows whether it should.

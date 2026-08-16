@@ -51,7 +51,9 @@ Not available on touch, which is fine — pinch does the same job there.
 
 Every track in the list also gets a dot on the map, at the centre of its
 bounding box, so the collection is visible geographically and not only as a list.
-Hovering names it; clicking one selects that track and opens its trip info. On a
+Hovering names it; clicking one selects that track and opens its trip info. **Show all** clears any
+country or tag filter and the search box along with the selection: a button that
+says it is showing everything should not leave most of the collection hidden. On a
 phone the dot stays the same size but its hit zone is widened to about 44px
 across — a 5px circle is a fine mouse target and a hopeless finger one — using
 the canvas renderer's hit tolerance rather than by drawing anything bigger. The
@@ -101,7 +103,8 @@ Selecting a track opens the info panel:
 - An **elevation profile**. Hovering it (or dragging on a touch screen) shows the
   distance, altitude and time at that point, and drops a marker on the map at the
   matching position.
-- **Download GPX**, and a *view raw* link that opens the file in the browser.
+- **⤓ GPX** and a *view raw* link, sitting after the last tag on the same line
+  and wrapping with them rather than claiming a row of their own.
 
 Downloads are named `2024.02.18 - Abbey St Bathans - 10.9km.gpx` — date, name,
 distance. Any part a track does not have is dropped along with its separator, so
@@ -254,6 +257,13 @@ Selecting a track clears the screen for the map: the track list, the site name,
 the Tracks button and the Upload button all go, leaving a bar with just **Show
 all** and **Trip info**. Show all moves into that bar, because the panel header
 it normally lives in is no longer on screen.
+
+A download shortcut appears under the layer switcher while a track is selected,
+so the file is one tap away instead of behind the trip sheet and a scroll. It is
+phone-only: on a desktop the list and the whole trip panel are already on screen.
+
+Tapping a tag closes the trip sheet and opens the track list filtered to it —
+filtering a list that is off screen otherwise looks like nothing happened.
 
 Tap targets are finger-sized throughout (44px for the close buttons, and no
 control under 32px), the layout never scrolls sideways down to a 320px screen,

@@ -1,5 +1,5 @@
 :root {
-  --app-version: "2026.08.16.6";
+  --app-version: "2026.08.16.8";
   --bg: #f6f7f9;
   --panel: #ffffff;
   --ink: #1b1f24;
@@ -301,7 +301,10 @@ body { display: flex; flex-direction: column; }
 
 /* ---------------- tag buttons ---------------- */
 
-.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 0; }
+/* Not a block of its own: its two links join the tags as flex items, so the
+   download sits after the last tag and wraps with them. */
+.dl { display: contents; }
 .tagbtn {
   font: inherit; font-size: 12.5px; line-height: 1;
   padding: 6px 10px; border-radius: 999px; cursor: pointer;
@@ -331,15 +334,15 @@ body { display: flex; flex-direction: column; }
 
 #info-body { overflow-y: auto; padding: 12px; flex: 1 1 auto; }
 
-.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px; }
 .stats > div {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 9px;
+  padding: 5px 9px;
 }
-.stats dt { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.stats dd { margin: 2px 0 0; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stats dt { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); line-height: 1.3; }
+.stats dd { margin: 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.35; }
 .stats dd small { font-size: 12px; font-weight: 400; color: var(--muted); }
 
 .profile-wrap h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
@@ -353,15 +356,18 @@ body { display: flex; flex-direction: column; }
 .profile .dot { fill: var(--accent); stroke: var(--panel); stroke-width: 2; }
 .readout { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; font-variant-numeric: tabular-nums; }
 
-.dl { margin: 16px 0 4px; display: flex; align-items: center; gap: 12px; }
 .dl a { color: var(--accent); }
 .dl .dlmain {
   text-decoration: none;
   font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1;
   border: 1px solid var(--accent);
-  border-radius: 9px;
-  padding: 8px 12px;
+  border-radius: 999px;
+  padding: 6px 11px;
+  white-space: nowrap;
 }
+#view-link { font-size: 12px; white-space: nowrap; }
 .dl .dlmain:hover { background: var(--accent); color: var(--accent-ink); }
 .dl #view-link { font-size: 13px; color: var(--muted); }
 
@@ -496,6 +502,13 @@ body { display: flex; flex-direction: column; }
 .leaflet-container { font: inherit; background: var(--bg); }
 .leaflet-control-attribution { font-size: 10px; }
 .leaflet-bar a, .leaflet-control-layers-toggle { width: 34px; height: 34px; line-height: 34px; }
+
+/* The download shortcut under the layer switcher, phones only. */
+.map-dl a {
+  font-size: 17px; text-align: center; text-decoration: none;
+  color: var(--accent); background: var(--panel);
+}
+.map-dl a:hover { color: var(--accent); }
 .hover-dot { pointer-events: none; }
 
 /* ---------------- mobile ---------------- */
@@ -533,14 +546,20 @@ body { display: flex; flex-direction: column; }
   }
   .panel .panel-head { position: relative; padding-top: 16px; }
 
+  /* Smaller here: it sits over the map, which is the whole screen on a phone. */
+  .leaflet-control-layers-toggle { width: 30px !important; height: 30px !important; }
+  .map-dl a { width: 30px; height: 30px; line-height: 30px; font-size: 15px; }
+
   .topbtn .lbl { display: none; }
   #btn-upload .lbl { display: inline; }
   /* A track is selected: the screen is the map, and the bar carries only the
      two things you still need — back to everything, and this track's details. */
   body.track-focus #btn-tracks,
   body.track-focus .home,
-  body.track-focus #btn-upload,
-  body.track-focus #panel-tracks { display: none !important; }
+  body.track-focus #btn-upload { display: none !important; }
+  /* Hidden while it is closed, but still openable — tapping a tag filters the
+     list and then shows it, which cannot work if the panel is display:none. */
+  body.track-focus #panel-tracks:not(.open) { display: none !important; }
   body.track-focus .track-title { max-width: 50vw; }
   #btn-showall-top { font-size: 13px; }
 
@@ -575,6 +594,9 @@ body { display: flex; flex-direction: column; }
     font-size: 20px; padding: 0;
   }
   .tagbtn { padding: 10px 14px; font-size: 13.5px; }
+  /* It sits among the tags, so it needs their height too — a 27px pill is a
+     fine mouse target and an awkward one for a thumb. */
+  .dl .dlmain { padding: 10px 14px; font-size: 13.5px; }
   .rowbtn { padding: 9px 12px; }
   .showall { padding: 9px 12px; font-size: 13px; }
   /* Inline by default, so padding alone would not grow the box. */
