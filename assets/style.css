@@ -58,14 +58,37 @@ body { display: flex; flex-direction: column; }
   flex: none;
 }
 
-#title {
+#topbar { position: relative; }
+
+/* Home. Left of the bar, next to the panel toggle. */
+.home {
   font-size: 16px;
   font-weight: 600;
+  color: inherit;
+  text-decoration: none;
   margin: 0 auto 0 4px;
+  white-space: nowrap;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+.home:hover { color: var(--accent); }
+
+/* Centred on the page, not on the space the buttons happen to leave, so the
+   track name sits over the middle of the map. Out of the flex flow entirely. */
+.track-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  max-width: min(46vw, 520px);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: none;   /* never intercept a click meant for the bar */
 }
+.track-title:empty { display: none; }
 
 .topbtn {
   display: inline-flex;
@@ -494,7 +517,9 @@ body { display: flex; flex-direction: column; }
 
   .topbtn .lbl { display: none; }
   #btn-upload .lbl { display: inline; }
-  #title { font-size: 15px; }
+  .home { font-size: 15px; }
+  /* Less room between the buttons on a phone, so give it less to work with. */
+  .track-title { font-size: 13.5px; max-width: 38vw; }
   .stats { grid-template-columns: 1fr 1fr; }
   .profile { height: 130px; }
 
@@ -517,7 +542,9 @@ body { display: flex; flex-direction: column; }
 
 @media (max-width: 420px) {
   #btn-upload .lbl { display: none; }
-  #title { max-width: 45vw; }
+  .home { font-size: 14px; }
+  /* Below this the bar is all buttons; the name is in the panel header anyway. */
+  .track-title { display: none; }
 }
 
 /* desktop: panels are always laid out, hidden by class */

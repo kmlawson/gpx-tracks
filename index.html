@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://server.arcgisonline.com https://services.arcgisonline.com https://*.basemaps.cartocdn.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'">
-<title>GPX Tracks</title>
+<title>My Tracks</title>
 <link rel="stylesheet" href="assets/leaflet/leaflet.css">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E🗺%3C/text%3E%3C/svg%3E">
@@ -16,7 +16,10 @@
   <button id="btn-tracks" class="topbtn" type="button" aria-expanded="false" aria-controls="panel-tracks">
     <span class="ico" aria-hidden="true">☰</span><span class="lbl">Tracks</span>
   </button>
-  <h1 id="title">GPX Tracks</h1>
+  <a id="home-link" class="home" href="index.html">My Tracks</a>
+  <!-- Absolutely positioned, so it centres on the page rather than on whatever
+       space the buttons leave over. -->
+  <h1 id="track-title" class="track-title"></h1>
   <button id="btn-info" class="topbtn" type="button" aria-expanded="false" aria-controls="panel-info" disabled>
     <span class="ico" aria-hidden="true">📈</span><span class="lbl">Trip info</span>
   </button>
@@ -40,6 +43,7 @@
         <label class="sr-only" for="sort">Sort by</label>
         <select id="sort">
           <option value="date">Date</option>
+          <option value="added">Added</option>
           <option value="distance">Distance</option>
           <option value="elevation">Elevation spread</option>
           <option value="duration">Duration</option>
@@ -83,7 +87,8 @@
     </div>
     <div id="info-body">
       <dl class="stats" id="stats"></dl>
-      <section class="profile-wrap">
+      <p id="info-empty" class="empty">Select a track to see its details.</p>
+      <section class="profile-wrap" id="profile-wrap" hidden>
         <h3>Elevation profile</h3>
         <div id="profile" class="profile"></div>
         <p id="profile-readout" class="readout">&nbsp;</p>
@@ -91,7 +96,7 @@
 
       <!-- This track's tags, each one a filter. -->
       <section id="tag-row" class="tag-row" hidden aria-label="Tags"></section>
-      <p class="dl">
+      <p class="dl" id="dl-row" hidden>
         <a id="dl-link" class="dlmain" href="#" download>⤓ Download GPX</a>
         <a id="view-link" href="#" target="_blank" rel="noopener">view raw</a>
       </p>

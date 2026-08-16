@@ -61,9 +61,11 @@ duration.
 
 - **Search** — type in the box to filter by name, activity, or date. Multiple
   words all have to match.
-- **Sort** — newest first by default; also by distance, elevation spread,
-  duration or name, with a button to flip the direction. Dates are shown as
-  `yyyy.mm.dd`, matching how tracks are usually named.
+- **Sort** — newest first by default; also by **Added** (when it went into the
+  collection, which differs from the walk date whenever an old export is
+  uploaded), distance, elevation spread, duration or name, with a button to flip
+  the direction. Dates are shown as `yyyy.mm.dd`, matching how tracks are usually
+  named.
 - **Download** — the ⤓ button on each row downloads that track's GPX
   immediately, without selecting it or leaving the page.
 - **Show all** — appears in the panel header while a track is selected. Clears
@@ -73,6 +75,10 @@ duration.
 
 A small **GitHub** link sits in the bottom-right corner of this panel, pointing
 at the source repository.
+
+With nothing selected the panel says so and shows nothing else — no empty
+elevation profile, and no Download GPX or *view raw* links pointing at a track
+that is not there.
 
 Selecting a track opens the info panel:
 
@@ -165,13 +171,25 @@ then choose a `.gpx` file. There is a progress bar for large files, and the new
 track is selected on the map as soon as it lands. Re-uploading a track that is
 already in the collection is refused rather than duplicated.
 
-Once signed in you can also **drag `.gpx` files straight onto the track list** —
-the panel highlights while you drag, and files upload one after another with a
+Once signed in you can also **drag `.gpx` files straight onto the track list**. The
+drag is accepted whether or not the page currently thinks you are signed in, and
+the question is settled when you drop: refusing the drag outright meant a stale
+idea of the session made dropping do nothing at all, with no way to tell that
+apart from the feature being broken. Dropped while signed out, it says so.
+
+The panel highlights while you drag, and files upload one after another with a
 progress strip along the bottom. Drop several at once and they queue; anything
 that is not a `.gpx`, or that the validator refuses, is reported and skipped
 without stopping the rest. Both routes run the same code, so a dropped file gets
 exactly the checks a dialog upload gets. Dropping a file anywhere else on the
 page is ignored rather than letting the browser navigate away from the site.
+
+### The header
+
+**My Tracks**, top left, is a link back to the collection with no track loaded.
+The selected track's name sits centred over the map — genuinely centred on the
+page rather than in whatever space the buttons leave over, and hidden on very
+narrow screens where the panel header already names it.
 
 ### On a phone
 

@@ -428,6 +428,9 @@
 
   function sortValue(t) {
     switch (sortKey) {
+      // When it was added to the collection, not when it was walked — the two
+      // diverge whenever an old export is uploaded.
+      case 'added': return t.uploaded_at || '';
       case 'distance': return t.distance_m || 0;
       case 'elevation': return t.ele_spread == null ? -1 : t.ele_spread;
       case 'duration': return t.duration_s || 0;
@@ -751,15 +754,23 @@
     current = null;
     setUrl(null);
     $('btn-info').disabled = true;
-    $('info-name').textContent = 'Trip';
-    $('title').textContent = 'GPX Tracks';
-    document.title = 'GPX Tracks';
-    $('stats').textContent = '';
-    $('profile').textContent = '';
-    $('tag-row').hidden = true;
+    clearInfoPanel();
     if (MOBILE()) panelOpen('panel-info', false);
     renderList();
     homeView();
+  }
+
+  /** Everything in the trip panel that only makes sense with a track selected. */
+  function clearInfoPanel() {
+    $('info-name').textContent = 'Trip';
+    $('track-title').textContent = '';
+    document.title = 'My Tracks';
+    $('stats').textContent = '';
+    $('profile').textContent = '';
+    $('profile-wrap').hidden = true;
+    $('tag-row').hidden = true;
+    $('dl-row').hidden = true;
+    $('info-empty').hidden = false;
   }
 
   function clearTrack() {
@@ -820,8 +831,13 @@
   function renderStats(meta) {
     var shownName = displayName(meta);
     $('info-name').textContent = shownName;
-    $('title').textContent = shownName || 'GPX Tracks';
-    document.title = (shownName ? shownName + ' · ' : '') + 'GPX Tracks';
+    $('track-title').textContent = shownName;
+    document.title = (shownName ? shownName + ' \u00b7 ' : '') + 'My Tracks';
+
+    // The panel describes a track, so none of it belongs on screen without one.
+    $('info-empty').hidden = true;
+    $('profile-wrap').hidden = false;
+    $('dl-row').hidden = false;
 
     var dl = $('dl-link');
     dl.href = fileUrl(meta.id);
@@ -1730,37 +1746,61 @@
 
   var panelTracks = $('panel-tracks');
 
+  /*
+   * The drag is accepted whether or not the page currently believes you are
+   * signed in, and the question is settled on drop. Refusing the drag outright
+   * meant a stale idea of the session — a cookie from before this browser
+   * recorded a sign-in, say — made dropping do nothing at all, with no way to
+   * tell that from the feature being broken.
+   */
   panelTracks.addEventListener('dragenter', function (e) {
-    if (!signedIn || !dragHasFiles(e)) return;
+    if (!dragHasFiles(e)) return;
     e.preventDefault();
     dragDepth++;
     dropHint(true);
   });
   panelTracks.addEventListener('dragover', function (e) {
-    if (!signedIn || !dragHasFiles(e)) return;
+    if (!dragHasFiles(e)) return;
     e.preventDefault();                       // without this the drop never fires
     e.dataTransfer.dropEffect = 'copy';
   });
   panelTracks.addEventListener('dragleave', function () {
-    if (!signedIn) return;
     dragDepth = Math.max(0, dragDepth - 1);
     if (!dragDepth) dropHint(false);
   });
   panelTracks.addEventListener('drop', function (e) {
-    if (!signedIn || !dragHasFiles(e)) return;
+    if (!dragHasFiles(e)) return;
     e.preventDefault();
     dragDepth = 0;
     dropHint(false);
+
     var files = gpxFilesFrom(e.dataTransfer);
     if (!files.length) { toast('Only .gpx files can be added.'); return; }
-    uploadDropped(files);
+
+    if (signedIn) { uploadDropped(files); return; }
+    // Ask the server rather than trust our own flag, then say so either way.
+    refreshSession().then(function () {
+      if (signedIn) uploadDropped(files);
+      else toast('Sign in first to add tracks — press Upload.');
+    });
   });
+
+  /**
+   * Elements that legitimately take a dropped file: the track list, and the
+   * file input in the upload dialog, which handles drops itself. Cancelling the
+   * default on those would break the very thing the drop is for.
+   */
+  function acceptsDrop(target) {
+    if (!(target instanceof Element)) return false;
+    if (panelTracks.contains(target)) return true;
+    return !!target.closest('input[type="file"], label[for="file"]');
+  }
 
   // Anywhere else, a dropped file would navigate away from the page and lose
   // whatever was on screen.
   ['dragover', 'drop'].forEach(function (type) {
     window.addEventListener(type, function (e) {
-      if (dragHasFiles(e) && !panelTracks.contains(e.target)) e.preventDefault();
+      if (dragHasFiles(e) && !acceptsDrop(e.target)) e.preventDefault();
     });
   });
 
